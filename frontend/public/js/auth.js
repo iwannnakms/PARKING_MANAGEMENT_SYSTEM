@@ -1,6 +1,6 @@
 // --- Authentication & UI Logic ---
 
-const API_BASE_URL = 'http://localhost:5001/api';
+const API_BASE_URL = '/api';
 
 // Toggle Auth Modal
 function toggleAuthModal() {

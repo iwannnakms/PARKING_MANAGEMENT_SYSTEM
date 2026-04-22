@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
+const path = require('path');
 const { Server } = require('socket.io');
 const connectDB = require('./config/db');
 
@@ -26,7 +27,6 @@ const io = new Server(server, {
 
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
-  
   socket.on('disconnect', () => {
     console.log(`Socket disconnected: ${socket.id}`);
   });
@@ -38,6 +38,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// Serve Frontend Static Files
+app.use(express.static(path.join(__dirname, '../frontend/public')));
+
 // Routes
 const authRoutes = require('./routes/authRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
@@ -45,9 +48,12 @@ const bookingRoutes = require('./routes/bookingRoutes');
 app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 
-// Root route
-app.get('/', (req, res) => {
-  res.send('Parking Management System API is running...');
+// Fallback for SPA Routing: Handle all remaining non-API requests
+app.use((req, res, next) => {
+  if (req.url.startsWith('/api')) {
+    return next();
+  }
+  res.sendFile(path.join(__dirname, '../frontend/public/index.html'));
 });
 
 // Error handling middleware

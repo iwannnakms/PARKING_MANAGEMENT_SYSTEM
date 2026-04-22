@@ -111,7 +111,7 @@ async function initDashboard() {
   if (!socket && typeof io !== 'undefined') {
     console.log('[ParkSync] Initializing Real-time Node...');
     try {
-      socket = io('http://localhost:5001');
+      socket = io();
       socket.on('connect', () => {
         document.querySelector('.status-dot').classList.add('green');
       });
