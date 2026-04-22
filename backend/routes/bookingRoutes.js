@@ -24,6 +24,12 @@ router.post('/force', verifyToken, requireRole('guard'), bookingController.force
 // Unified Validation (Requires login, Guard only) - Handles Entry & Exit
 router.post('/validate-token', verifyToken, requireRole('guard'), bookingController.validateToken);
 
+// Get Recent Activity Log (Requires login, Admin or Guard)
+router.get('/activity', verifyToken, (req, res, next) => {
+  if (req.user.role === 'admin' || req.user.role === 'guard') return next();
+  return res.status(403).json({ error: 'Access denied.' });
+}, bookingController.getRecentActivity);
+
 // Get Admin Stats (Requires login, Admin only)
 router.get('/stats', verifyToken, requireRole('admin'), bookingController.getAdminStats);
 

@@ -81,9 +81,11 @@ function buildSidebar(role) {
   const navItems = [];
   if (role === 'admin') {
     navItems.push({ id: 'main', label: 'Analytics', icon: ICONS.dashboard });
+    navItems.push({ id: 'map', label: 'Facility Map', icon: ICONS.grid });
   } else if (role === 'guard') {
     navItems.push({ id: 'main', label: 'Entry Mode', icon: ICONS.scanner, sub: 'checkin' });
     navItems.push({ id: 'main', label: 'Exit Mode', icon: ICONS.logout, sub: 'checkout' });
+    navItems.push({ id: 'map', label: 'Spot Monitor', icon: ICONS.grid });
   } else {
     navItems.push({ id: 'main', label: 'Bookings', icon: ICONS.grid });
     navItems.push({ id: 'history', label: 'History', icon: ICONS.history });
@@ -107,21 +109,16 @@ function buildSidebar(role) {
 }
 
 async function initDashboard() {
-  // Safety check for socket.io library
   if (!socket && typeof io !== 'undefined') {
-    console.log('[ParkSync] Initializing Real-time Node...');
     try {
       socket = io();
-      socket.on('connect', () => {
-        document.querySelector('.status-dot').classList.add('green');
-      });
+      socket.on('connect', () => document.querySelector('.status-dot').classList.add('green'));
       socket.on('spotUpdated', () => fetchData());
     } catch (e) {
       console.warn('[ParkSync] Socket connection failed.');
     }
   }
 
-  // Inject Role Initializers
   try {
     if (GlobalState.currentView === 'admin' && typeof initAdmin === 'function') initAdmin();
     if (GlobalState.currentView === 'customer' && typeof initCustomer === 'function') initCustomer();
@@ -134,19 +131,25 @@ async function initDashboard() {
 }
 
 async function fetchData() {
-  console.log('[ParkSync] Refreshing Local State...');
   try {
     const headers = { 'Authorization': `Bearer ${GlobalState.token}` };
+    
+    // Fetch spots (All roles)
     const spotsRes = await fetch(`${API_BASE_URL}/bookings/spots`, { headers });
     const spotsData = await spotsRes.json();
     GlobalState.spots = spotsData.spots || [];
 
     if (GlobalState.currentView === 'admin') {
-      const statsRes = await fetch(`${API_BASE_URL}/bookings/stats`, { headers });
+      const [statsRes, activityRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/bookings/stats`, { headers }),
+        fetch(`${API_BASE_URL}/bookings/activity`, { headers })
+      ]);
       const statsData = await statsRes.json();
+      const activityData = await activityRes.json();
       GlobalState.stats = statsData;
-      GlobalState.recentActivity = statsData.recentActivity || [];
-    } else if (GlobalState.currentView === 'customer') {
+      GlobalState.recentActivity = activityData.activity || [];
+    } 
+    else if (GlobalState.currentView === 'customer') {
       const [myBookingRes, historyRes] = await Promise.all([
         fetch(`${API_BASE_URL}/bookings/my-booking`, { headers }),
         fetch(`${API_BASE_URL}/bookings/history`, { headers })
@@ -155,17 +158,14 @@ async function fetchData() {
       const historyData = await historyRes.json();
       GlobalState.myBooking = myBookingData.booking;
       GlobalState.history = historyData.history || [];
-      GlobalState.stats = {
-        availableSpots: GlobalState.spots.filter(s => s.status === 'Available').length,
-        occupiedSpots: GlobalState.spots.filter(s => s.status === 'Occupied').length,
-        bookedSpots: GlobalState.spots.filter(s => s.status === 'Booked').length,
-      };
-    } else if (GlobalState.currentView === 'guard') {
-      const statsRes = await fetch(`${API_BASE_URL}/bookings/stats`, { headers });
-      const statsData = await statsRes.json();
-      GlobalState.stats = statsData;
-      GlobalState.recentActivity = statsData.recentActivity || [];
+    } 
+    else if (GlobalState.currentView === 'guard') {
+      // Guard now uses the shared activity endpoint
+      const activityRes = await fetch(`${API_BASE_URL}/bookings/activity`, { headers });
+      const activityData = await activityRes.json();
+      GlobalState.recentActivity = activityData.activity || [];
     }
+
     GlobalState.syncUI();
   } catch (err) {
     console.error('[ParkSync] Data Synchronization Failed:', err);

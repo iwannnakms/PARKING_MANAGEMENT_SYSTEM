@@ -195,6 +195,21 @@ exports.forceAction = async (req, res) => {
   }
 };
 
+// Get Recent Activity Log (Admin & Guard)
+exports.getRecentActivity = async (req, res) => {
+  try {
+    const activity = await Booking.find()
+      .sort({ updatedAt: -1 })
+      .limit(15)
+      .populate('user', 'name')
+      .populate('spot', 'spotNumber');
+
+    res.status(200).json({ activity });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error fetching activity' });
+  }
+};
+
 // Get Admin Stats (Admin only)
 exports.getAdminStats = async (req, res) => {
   try {
