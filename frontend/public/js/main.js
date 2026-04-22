@@ -54,7 +54,7 @@ function closeQrModal() {
 
 // Global API Base URL (Assuming frontend runs on a different port than 5000 during dev, 
 // but we'll hardcode to the backend port for simplicity).
-const API_BASE_URL = 'http://localhost:5001/api';
+const API_BASE_URL = '/api';
 
 // --- Auth Handlers ---
 document.getElementById('login-form').addEventListener('submit', async (e) => {
