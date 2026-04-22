@@ -21,6 +21,12 @@ router.post('/cancel', verifyToken, requireRole('customer'), bookingController.c
 // Scan QR Code (Requires login, Guard only)
 router.post('/scan', verifyToken, requireRole('guard'), bookingController.scanQrCode);
 
+// Check-out (Requires login, Guard only)
+router.post('/checkout', verifyToken, requireRole('guard'), bookingController.checkOut);
+
+// Force Action (Requires login, Guard only)
+router.post('/force', verifyToken, requireRole('guard'), bookingController.forceAction);
+
 // Get Admin Stats (Requires login, Admin only)
 router.get('/stats', verifyToken, requireRole('admin'), bookingController.getAdminStats);
 

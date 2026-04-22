@@ -6,7 +6,7 @@ function initGuard() {
   viewTitle.innerText = "Security Terminal";
 
   mainContent.innerHTML = `
-    <div class="guard-layout">
+    <div class="guard-layout reveal visible">
       <div class="guard-grid">
         <!-- Scanner & Verification -->
         <div class="glass-card scanner-panel">
@@ -26,10 +26,9 @@ function initGuard() {
             <div class="input-group">
               <label class="static-label">Authentication Token</label>
               <div class="premium-input-wrapper">
-                <input type="text" id="manual-token" placeholder="Enter 32-character hex token..." autocomplete="off">
+                <input type="text" id="manual-token" placeholder="Enter token hex..." autocomplete="off">
                 <button class="verify-btn" onclick="verifyToken()">
                   <span>Validate</span>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                 </button>
               </div>
             </div>
@@ -38,7 +37,7 @@ function initGuard() {
           <div id="verify-result" class="verify-feedback hidden"></div>
         </div>
 
-        <!-- Real-time Status -->
+        <!-- Real-time Status & Quick Actions -->
         <div class="glass-card status-panel">
           <h3>Facility Status</h3>
           <div class="status-metrics mt-4">
@@ -49,13 +48,32 @@ function initGuard() {
           </div>
           
           <div class="quick-actions mt-8">
-            <h4>Quick Resolution</h4>
-            <div class="action-buttons">
-              <button class="action-btn checkin" onclick="triggerScanAction('checkin')">Force Check-In</button>
-              <button class="action-btn checkout" onclick="triggerScanAction('checkout')">Force Check-Out</button>
+            <h4>Manual Spot Control</h4>
+            <p class="action-hint mb-4">Select a spot from the map to force action</p>
+            
+            <div id="guard-selected-spot" class="selected-spot-banner mb-4">
+              <div class="banner-info">
+                <span class="label">Target Spot</span>
+                <strong id="guard-display-spot">--</strong>
+              </div>
             </div>
-            <p class="action-hint">Use only if scanner/token fails validation</p>
+
+            <div class="action-buttons">
+              <button id="btn-force-checkin" class="action-btn checkin" onclick="triggerForce('checkin')" disabled>Force Check-In</button>
+              <button id="btn-force-checkout" class="action-btn checkout" onclick="triggerForce('checkout')" disabled>Force Check-Out</button>
+            </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Spot Monitor Grid -->
+      <div class="glass-card mt-8">
+        <div class="card-header">
+          <h3>Spot Monitor</h3>
+          <p>Click any spot to enable manual override</p>
+        </div>
+        <div id="guard-parking-grid" class="parking-grid mt-4">
+          <!-- Monitor spots injected here -->
         </div>
       </div>
 
@@ -75,83 +93,119 @@ function initGuard() {
   startGuardScanner();
 }
 
-function renderGuard() {
-  const { stats, recentActivity } = GlobalState;
+let guardSelectedSpotId = null;
 
-  // Update Counters
+function renderGuard() {
+  const { stats, spots, recentActivity } = GlobalState;
+
+  // 1. Update Counters
   const carsInside = document.getElementById('guard-cars-inside');
   if (carsInside) carsInside.innerText = stats.occupiedSpots || 0;
 
-  // Update Log
+  // 2. Render Monitor Grid
+  const grid = document.getElementById('guard-parking-grid');
+  if (grid) {
+    grid.innerHTML = '';
+    spots.forEach(spot => {
+      const spotDiv = document.createElement('div');
+      const isSelected = guardSelectedSpotId === spot._id;
+      spotDiv.className = `spot-card mini ${spot.status.toLowerCase()} ${isSelected ? 'selected' : ''}`;
+      spotDiv.innerHTML = `<span>${spot.spotNumber}</span>`;
+      spotDiv.onclick = () => selectGuardSpot(spot);
+      grid.appendChild(spotDiv);
+    });
+  }
+
+  // 3. Update Log
   const log = document.getElementById('guard-event-log');
   if (log) {
     log.innerHTML = '';
-    recentActivity.slice(0, 5).forEach(act => {
+    // Show last 8 actions
+    recentActivity.slice(0, 8).forEach(act => {
       const item = document.createElement('div');
       item.className = 'log-entry';
-      const time = new Date(act.updatedAt).toLocaleTimeString();
+      const time = new Date(act.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       item.innerHTML = `
         <span class="time">${time}</span>
-        <span class="msg">Spot <strong>${act.spot?.spotNumber || 'N/A'}</strong> ${act.status} by ${act.user?.name || 'User'}</span>
+        <span class="msg">Spot <strong>${act.spot?.spotNumber || 'N/A'}</strong> set to <strong>${act.status}</strong></span>
       `;
       log.appendChild(item);
     });
   }
 }
 
-let html5Scanner;
+function selectGuardSpot(spot) {
+  guardSelectedSpotId = spot._id;
+  const display = document.getElementById('guard-display-spot');
+  const btnIn = document.getElementById('btn-force-checkin');
+  const btnOut = document.getElementById('btn-force-checkout');
 
-function startGuardScanner() {
-  if (html5Scanner) return;
+  if (display) display.innerText = spot.spotNumber;
+  if (btnIn) btnIn.disabled = false;
+  if (btnOut) btnOut.disabled = false;
 
-  html5Scanner = new Html5Qrcode("guard-reader");
-  const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-  
-  html5Scanner.start(
-    { facingMode: "environment" }, 
-    config, 
-    (text) => {
-      document.getElementById('manual-token').value = text;
-      verifyToken(text);
-    }
-  ).catch(err => console.warn("Scanner Error:", err));
+  renderGuard();
 }
 
-async function verifyToken(passedToken) {
-  const token = passedToken || document.getElementById('manual-token').value;
-  const feedback = document.getElementById('verify-result');
+async function triggerForce(action) {
+  if (!guardSelectedSpotId) return;
 
-  if (!token) return;
-
-  feedback.classList.remove('hidden', 'success', 'error');
-  feedback.innerText = "Verifying Token...";
-  
   try {
-    const res = await fetch(`${API_BASE_URL}/bookings/scan`, {
+    const res = await fetch(`${API_BASE_URL}/bookings/force`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${GlobalState.token}`
       },
-      body: JSON.stringify({ qrCodeToken: token })
+      body: JSON.stringify({ spotId: guardSelectedSpotId, action })
     });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error);
+    }
 
-    feedback.classList.add('success');
-    feedback.innerText = `Success! Authorized Spot ${data.spotNumber}`;
-    
-    // Refresh Global State
-    fetchData();
-
+    showToast(`Spot updated successfully`, 'success');
+    fetchData(); // Sync global state
   } catch (err) {
-    feedback.classList.add('error');
-    feedback.innerText = `Error: ${err.message}`;
+    showToast(err.message, 'error');
   }
 }
 
-function triggerScanAction(type) {
-  // Simplified for prototype: Usually would require a selected spot
-  alert(`Manual ${type} triggered. Select a spot from the Facility Map (Coming Soon).`);
+let html5Scanner;
+function startGuardScanner() {
+  if (html5Scanner) return;
+  html5Scanner = new Html5Qrcode("guard-reader");
+  const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+  html5Scanner.start({ facingMode: "environment" }, config, (text) => {
+    document.getElementById('manual-token').value = text;
+    verifyToken(text);
+  }).catch(err => console.warn("Scanner Error:", err));
+}
+
+async function verifyToken(passedToken) {
+  const token = passedToken || document.getElementById('manual-token').value;
+  const feedback = document.getElementById('verify-result');
+  if (!token) return;
+
+  feedback.classList.remove('hidden', 'success', 'error');
+  feedback.innerText = "Verifying...";
+  
+  try {
+    const res = await fetch(`${API_BASE_URL}/bookings/scan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GlobalState.token}` },
+      body: JSON.stringify({ qrCodeToken: token })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    showToast(`Access Granted: Spot ${data.spotNumber}`, 'success');
+    document.getElementById('manual-token').value = '';
+    fetchData();
+  } catch (err) {
+    showToast(err.message, 'error');
+    feedback.classList.add('error');
+    feedback.innerText = err.message;
+  }
 }

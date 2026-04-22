@@ -185,6 +185,75 @@ exports.scanQrCode = async (req, res) => {
   }
 };
 
+// Check-Out (Guard only)
+exports.checkOut = async (req, res) => {
+  try {
+    const { spotId } = req.body;
+
+    const spot = await Spot.findById(spotId);
+    if (!spot || spot.status !== 'Occupied') {
+      return res.status(400).json({ error: 'Spot is not currently occupied.' });
+    }
+
+    const booking = await Booking.findOne({ spot: spotId, status: 'Checked-In' });
+    
+    // Update statuses
+    spot.status = 'Available';
+    spot.currentBookingId = null;
+    if (booking) {
+      booking.status = 'Completed';
+      booking.endTime = Date.now();
+      await booking.save();
+    }
+    await spot.save();
+
+    req.io.emit('spotUpdated', {
+      spotId: spot._id,
+      spotNumber: spot.spotNumber,
+      status: spot.status,
+      booking: booking
+    });
+
+    res.status(200).json({ message: 'Check-out successful' });
+  } catch (error) {
+    console.error('Check-out Error:', error);
+    res.status(500).json({ error: 'Internal server error during check-out' });
+  }
+};
+
+// Force Action (Guard only - bypass QR)
+exports.forceAction = async (req, res) => {
+  try {
+    const { spotId, action } = req.body; // action: 'checkin' or 'checkout'
+    const spot = await Spot.findById(spotId);
+    if (!spot) return res.status(404).json({ error: 'Spot not found' });
+
+    if (action === 'checkin') {
+      spot.status = 'Occupied';
+      // Find latest booked session if exists
+      const booking = await Booking.findOne({ spot: spotId, status: 'Booked' });
+      if (booking) {
+        booking.status = 'Checked-In';
+        await booking.save();
+      }
+    } else {
+      spot.status = 'Available';
+      spot.currentBookingId = null;
+      const booking = await Booking.findOne({ spot: spotId, status: 'Checked-In' });
+      if (booking) {
+        booking.status = 'Completed';
+        await booking.save();
+      }
+    }
+
+    await spot.save();
+    req.io.emit('spotUpdated', { spotId: spot._id, spotNumber: spot.spotNumber, status: spot.status });
+    res.status(200).json({ message: `Force ${action} successful` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // Get Admin Stats (Admin only)
 exports.getAdminStats = async (req, res) => {
   try {
