@@ -184,7 +184,7 @@ async function verifyToken(passedToken) {
   const mode = GlobalState.guardMode; 
   
   try {
-    const res = await fetch(`${API_BASE_URL}/validate-token`, {
+    const res = await fetch(`${API_BASE_URL}/bookings/validate-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
