@@ -32,7 +32,7 @@ exports.getMyBooking = async (req, res) => {
 // Book a spot (Customer only)
 exports.bookSpot = async (req, res) => {
   try {
-    const { spotId, vehicleType, duration, startTime } = req.body;
+    const { spotId, vehicleType, vehicleRegistration, startTime } = req.body;
     const userId = req.user.userId;
 
     if (!spotId) return res.status(400).json({ error: 'Spot ID is required' });
@@ -44,10 +44,9 @@ exports.bookSpot = async (req, res) => {
     });
 
     if (activeBooking) {
-      return res.status(403).json({ error: 'You already have an active reservation. Please cancel or complete it first.' });
+      return res.status(403).json({ error: 'You already have an active reservation.' });
     }
 
-    // 1. Atomic update to prevent race conditions
     const updatedSpot = await Spot.findOneAndUpdate(
       { _id: spotId, status: 'Available' },
       { status: 'Booked' },
@@ -58,7 +57,6 @@ exports.bookSpot = async (req, res) => {
       return res.status(409).json({ error: 'Race condition averted: Spot is no longer available' });
     }
 
-    // 2. We now have exclusive claim to this spot. Create the booking.
     const qrToken = crypto.randomBytes(16).toString('hex');
     const newBooking = new Booking({
       user: userId,
@@ -66,17 +64,13 @@ exports.bookSpot = async (req, res) => {
       status: 'Booked',
       qrCodeToken: qrToken,
       vehicleType: vehicleType || 'Four-wheeler',
-      duration: duration || 1,
+      vehicleRegistration: vehicleRegistration || 'N/A',
       startTime: startTime ? new Date(startTime) : Date.now()
     });
-
     await newBooking.save();
-
-    // 3. Link booking to spot
     updatedSpot.currentBookingId = newBooking._id;
     await updatedSpot.save();
 
-    // 4. Emit Socket.io event to all connected clients
     req.io.emit('spotUpdated', {
       spotId: updatedSpot._id,
       spotNumber: updatedSpot.spotNumber,
@@ -84,10 +78,7 @@ exports.bookSpot = async (req, res) => {
       booking: newBooking
     });
 
-    res.status(200).json({
-      message: 'Spot booked successfully',
-      booking: newBooking
-    });
+    res.status(200).json({ message: 'Spot booked successfully', booking: newBooking });
   } catch (error) {
     console.error('Book Spot Error:', error);
     res.status(500).json({ error: 'Internal server error during booking' });
@@ -107,8 +98,6 @@ exports.cancelBooking = async (req, res) => {
     }
 
     const spot = booking.spot;
-
-    // Update statuses
     booking.status = 'Cancelled';
     spot.status = 'Available';
     spot.currentBookingId = null;
@@ -116,17 +105,10 @@ exports.cancelBooking = async (req, res) => {
     await booking.save();
     await spot.save();
 
-    // Broadcast the update
-    req.io.emit('spotUpdated', {
-      spotId: spot._id,
-      spotNumber: spot.spotNumber,
-      status: spot.status
-    });
-
+    req.io.emit('spotUpdated', { spotId: spot._id, spotNumber: spot.spotNumber, status: spot.status });
     res.status(200).json({ message: 'Booking cancelled successfully' });
   } catch (error) {
-    console.error('Cancel Booking Error:', error);
-    res.status(500).json({ error: 'Internal server error during cancellation' });
+    res.status(500).json({ error: error.message });
   }
 };
 
@@ -140,98 +122,56 @@ exports.getUserHistory = async (req, res) => {
 
     res.status(200).json({ history });
   } catch (error) {
-    console.error('History Error:', error);
-    res.status(500).json({ error: 'Internal server error fetching history' });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// Scan QR Code (Guard only)
-exports.scanQrCode = async (req, res) => {
+// Unified Token Validation (Check-in/Check-out)
+exports.validateToken = async (req, res) => {
   try {
-    const { qrCodeToken } = req.body;
-
-    if (!qrCodeToken) return res.status(400).json({ error: 'QR Code token is required' });
-
-    const booking = await Booking.findOne({ qrCodeToken, status: 'Booked' }).populate('spot');
+    const { qrCodeToken, mode } = req.body;
     
-    if (!booking) {
-      return res.status(404).json({ error: 'Invalid or already processed QR Code' });
-    }
+    if (mode === 'checkin') {
+      const booking = await Booking.findOne({ qrCodeToken, status: 'Booked' }).populate('spot');
+      if (!booking) return res.status(404).json({ error: 'No active booking found for this token.' });
+      
+      booking.status = 'Checked-In';
+      booking.spot.status = 'Occupied';
+      await booking.save();
+      await booking.spot.save();
 
-    const spot = booking.spot;
-
-    // Update booking and spot status
-    booking.status = 'Checked-In';
-    spot.status = 'Occupied';
-
-    await booking.save();
-    await spot.save();
-
-    // Broadcast the update
-    req.io.emit('spotUpdated', {
-      spotId: spot._id,
-      spotNumber: spot.spotNumber,
-      status: spot.status,
-      booking: booking
-    });
-
-    res.status(200).json({
-      message: 'Check-in successful',
-      spotNumber: spot.spotNumber
-    });
-  } catch (error) {
-    console.error('Scan QR Error:', error);
-    res.status(500).json({ error: 'Internal server error during QR scan' });
-  }
-};
-
-// Check-Out (Guard only)
-exports.checkOut = async (req, res) => {
-  try {
-    const { spotId } = req.body;
-
-    const spot = await Spot.findById(spotId);
-    if (!spot || spot.status !== 'Occupied') {
-      return res.status(400).json({ error: 'Spot is not currently occupied.' });
-    }
-
-    const booking = await Booking.findOne({ spot: spotId, status: 'Checked-In' });
-    
-    // Update statuses
-    spot.status = 'Available';
-    spot.currentBookingId = null;
-    if (booking) {
+      req.io.emit('spotUpdated', { spotId: booking.spot._id, spotNumber: booking.spot.spotNumber, status: 'Occupied', booking });
+      return res.status(200).json({ message: 'Check-in successful', spotNumber: booking.spot.spotNumber });
+    } else {
+      const booking = await Booking.findOne({ qrCodeToken, status: 'Checked-In' }).populate('spot');
+      if (!booking) return res.status(404).json({ error: 'No vehicle found inside with this token.' });
+      
       booking.status = 'Completed';
       booking.endTime = Date.now();
+      booking.spot.status = 'Available';
+      booking.spot.currentBookingId = null;
       await booking.save();
+      await booking.spot.save();
+
+      req.io.emit('spotUpdated', { spotId: booking.spot._id, spotNumber: booking.spot.spotNumber, status: 'Available', booking });
+      return res.status(200).json({ message: 'Check-out successful', spotNumber: booking.spot.spotNumber });
     }
-    await spot.save();
-
-    req.io.emit('spotUpdated', {
-      spotId: spot._id,
-      spotNumber: spot.spotNumber,
-      status: spot.status,
-      booking: booking
-    });
-
-    res.status(200).json({ message: 'Check-out successful' });
   } catch (error) {
-    console.error('Check-out Error:', error);
-    res.status(500).json({ error: 'Internal server error during check-out' });
+    res.status(500).json({ error: error.message });
   }
 };
 
 // Force Action (Guard only - bypass QR)
 exports.forceAction = async (req, res) => {
   try {
-    const { spotId, action } = req.body; // action: 'checkin' or 'checkout'
+    const { spotId, action } = req.body;
     const spot = await Spot.findById(spotId);
     if (!spot) return res.status(404).json({ error: 'Spot not found' });
 
+    let booking;
     if (action === 'checkin') {
       spot.status = 'Occupied';
-      // Find latest booked session if exists
-      const booking = await Booking.findOne({ spot: spotId, status: 'Booked' });
+      booking = await Booking.findOne({ spot: spotId, status: 'Booked' });
       if (booking) {
         booking.status = 'Checked-In';
         await booking.save();
@@ -239,15 +179,16 @@ exports.forceAction = async (req, res) => {
     } else {
       spot.status = 'Available';
       spot.currentBookingId = null;
-      const booking = await Booking.findOne({ spot: spotId, status: 'Checked-In' });
+      booking = await Booking.findOne({ spot: spotId, status: 'Checked-In' });
       if (booking) {
         booking.status = 'Completed';
+        booking.endTime = Date.now();
         await booking.save();
       }
     }
 
     await spot.save();
-    req.io.emit('spotUpdated', { spotId: spot._id, spotNumber: spot.spotNumber, status: spot.status });
+    req.io.emit('spotUpdated', { spotId: spot._id, spotNumber: spot.spotNumber, status: spot.status, booking });
     res.status(200).json({ message: `Force ${action} successful` });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -262,11 +203,9 @@ exports.getAdminStats = async (req, res) => {
     const bookedSpots = await Spot.countDocuments({ status: 'Booked' });
     const occupiedSpots = await Spot.countDocuments({ status: 'Occupied' });
     
-    // Revenue mock: Assume $10 per completed/checked-in booking
     const checkInCount = await Booking.countDocuments({ status: { $in: ['Checked-In', 'Completed'] } });
     const totalRevenue = checkInCount * 10;
 
-    // Daily Check-ins (since midnight)
     const startOfDay = new Date();
     startOfDay.setHours(0,0,0,0);
     const dailyCheckins = await Booking.countDocuments({ 
@@ -274,7 +213,6 @@ exports.getAdminStats = async (req, res) => {
       updatedAt: { $gte: startOfDay } 
     });
 
-    // Recent Activity Log
     const recentActivity = await Booking.find()
       .sort({ updatedAt: -1 })
       .limit(10)

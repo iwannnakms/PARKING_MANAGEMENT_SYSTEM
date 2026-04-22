@@ -18,14 +18,11 @@ router.post('/book', verifyToken, requireRole('customer'), bookingController.boo
 // Cancel a booking (Requires login, Customer only)
 router.post('/cancel', verifyToken, requireRole('customer'), bookingController.cancelBooking);
 
-// Scan QR Code (Requires login, Guard only)
-router.post('/scan', verifyToken, requireRole('guard'), bookingController.scanQrCode);
-
-// Check-out (Requires login, Guard only)
-router.post('/checkout', verifyToken, requireRole('guard'), bookingController.checkOut);
-
 // Force Action (Requires login, Guard only)
 router.post('/force', verifyToken, requireRole('guard'), bookingController.forceAction);
+
+// Unified Validation (Requires login, Guard only) - Handles Entry & Exit
+router.post('/validate-token', verifyToken, requireRole('guard'), bookingController.validateToken);
 
 // Get Admin Stats (Requires login, Admin only)
 router.get('/stats', verifyToken, requireRole('admin'), bookingController.getAdminStats);

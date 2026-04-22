@@ -3,17 +3,18 @@
 function initGuard() {
   const mainContent = document.getElementById('main-content');
   const viewTitle = document.getElementById('view-title');
-  viewTitle.innerText = "Security Terminal";
+  const mode = GlobalState.guardMode === 'checkin' ? "Entry Scanner" : "Exit Scanner";
+  viewTitle.innerText = mode;
 
   mainContent.innerHTML = `
     <div class="guard-layout reveal visible">
       <div class="guard-grid">
         <!-- Scanner & Verification -->
-        <div class="glass-card scanner-panel">
+        <div class="glass-card scanner-panel ${GlobalState.guardMode}">
           <div class="scanner-header">
-            <h3>QR Verification</h3>
+            <h3>${GlobalState.guardMode === 'checkin' ? 'Check-In Mode' : 'Check-Out Mode'}</h3>
             <div class="live-status">
-              <span class="status-dot green"></span> System Live
+              <span class="status-dot green"></span> Terminal Active
             </div>
           </div>
           
@@ -24,9 +25,9 @@ function initGuard() {
 
           <div class="manual-entry-container mt-8">
             <div class="input-group">
-              <label class="static-label">Authentication Token</label>
+              <label class="static-label">Authentication Token (${GlobalState.guardMode})</label>
               <div class="premium-input-wrapper">
-                <input type="text" id="manual-token" placeholder="Enter token hex..." autocomplete="off">
+                <input type="text" id="manual-token" placeholder="Paste hex token here..." autocomplete="off">
                 <button class="verify-btn" onclick="verifyToken()">
                   <span>Validate</span>
                 </button>
@@ -37,31 +38,26 @@ function initGuard() {
           <div id="verify-result" class="verify-feedback hidden"></div>
         </div>
 
-        <!-- Real-time Status & Quick Actions -->
+        <!-- Quick Actions & Manual Control -->
         <div class="glass-card status-panel">
-          <h3>Facility Status</h3>
-          <div class="status-metrics mt-4">
-            <div class="metric">
-              <span class="m-value" id="guard-cars-inside">0</span>
-              <span class="m-label">Vehicles Inside</span>
-            </div>
+          <div class="card-header">
+            <h3>Manual Spot Control</h3>
+            <p>Click a spot below to force override</p>
           </div>
           
-          <div class="quick-actions mt-8">
-            <h4>Manual Spot Control</h4>
-            <p class="action-hint mb-4">Select a spot from the map to force action</p>
-            
+          <div class="quick-actions mt-6">
             <div id="guard-selected-spot" class="selected-spot-banner mb-4">
               <div class="banner-info">
-                <span class="label">Target Spot</span>
+                <span class="label">Target Coordinate</span>
                 <strong id="guard-display-spot">--</strong>
               </div>
             </div>
 
             <div class="action-buttons">
-              <button id="btn-force-checkin" class="action-btn checkin" onclick="triggerForce('checkin')" disabled>Force Check-In</button>
-              <button id="btn-force-checkout" class="action-btn checkout" onclick="triggerForce('checkout')" disabled>Force Check-Out</button>
+              <button id="btn-force-checkin" class="action-btn checkin" onclick="triggerForce('checkin')" disabled>Force Entry</button>
+              <button id="btn-force-checkout" class="action-btn checkout" onclick="triggerForce('checkout')" disabled>Force Exit</button>
             </div>
+            <p class="action-hint mt-4">Use only for manual overrides</p>
           </div>
         </div>
       </div>
@@ -70,7 +66,7 @@ function initGuard() {
       <div class="glass-card mt-8">
         <div class="card-header">
           <h3>Spot Monitor</h3>
-          <p>Click any spot to enable manual override</p>
+          <p>Real-time bird's-eye view of all spots</p>
         </div>
         <div id="guard-parking-grid" class="parking-grid mt-4">
           <!-- Monitor spots injected here -->
@@ -79,7 +75,7 @@ function initGuard() {
 
       <!-- Recent Log -->
       <div class="glass-card mt-8">
-        <h3>Terminal Event Log</h3>
+        <h3>Terminal Validation Log</h3>
         <div class="log-wrapper mt-4">
           <div id="guard-event-log" class="event-log">
             <!-- Events injected here -->
@@ -96,13 +92,9 @@ function initGuard() {
 let guardSelectedSpotId = null;
 
 function renderGuard() {
-  const { stats, spots, recentActivity } = GlobalState;
+  const { stats, spots, recentActivity, guardMode } = GlobalState;
 
-  // 1. Update Counters
-  const carsInside = document.getElementById('guard-cars-inside');
-  if (carsInside) carsInside.innerText = stats.occupiedSpots || 0;
-
-  // 2. Render Monitor Grid
+  // 1. Render Monitor Grid
   const grid = document.getElementById('guard-parking-grid');
   if (grid) {
     grid.innerHTML = '';
@@ -116,18 +108,17 @@ function renderGuard() {
     });
   }
 
-  // 3. Update Log
+  // 2. Update Log
   const log = document.getElementById('guard-event-log');
   if (log) {
     log.innerHTML = '';
-    // Show last 8 actions
     recentActivity.slice(0, 8).forEach(act => {
       const item = document.createElement('div');
       item.className = 'log-entry';
       const time = new Date(act.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       item.innerHTML = `
         <span class="time">${time}</span>
-        <span class="msg">Spot <strong>${act.spot?.spotNumber || 'N/A'}</strong> set to <strong>${act.status}</strong></span>
+        <span class="msg">Spot <strong>${act.spot?.spotNumber || 'N/A'}</strong> ${act.status}</span>
       `;
       log.appendChild(item);
     });
@@ -160,13 +151,16 @@ async function triggerForce(action) {
       body: JSON.stringify({ spotId: guardSelectedSpotId, action })
     });
 
-    if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.error);
+    const contentType = res.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+       throw new Error("Server error: Endpoint returned invalid data.");
     }
 
-    showToast(`Spot updated successfully`, 'success');
-    fetchData(); // Sync global state
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    showToast(`Force ${action} successful`, 'success');
+    fetchData();
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -185,27 +179,32 @@ function startGuardScanner() {
 
 async function verifyToken(passedToken) {
   const token = passedToken || document.getElementById('manual-token').value;
-  const feedback = document.getElementById('verify-result');
   if (!token) return;
 
-  feedback.classList.remove('hidden', 'success', 'error');
-  feedback.innerText = "Verifying...";
+  const mode = GlobalState.guardMode; 
   
   try {
-    const res = await fetch(`${API_BASE_URL}/bookings/scan`, {
+    const res = await fetch(`${API_BASE_URL}/validate-token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GlobalState.token}` },
-      body: JSON.stringify({ qrCodeToken: token })
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GlobalState.token}`
+      },
+      body: JSON.stringify({ qrCodeToken: token, mode })
     });
+
+    const contentType = res.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+       throw new Error("Validation node unreachable.");
+    }
+
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
 
-    showToast(`Access Granted: Spot ${data.spotNumber}`, 'success');
+    showToast(data.message, 'success');
     document.getElementById('manual-token').value = '';
     fetchData();
   } catch (err) {
     showToast(err.message, 'error');
-    feedback.classList.add('error');
-    feedback.innerText = err.message;
   }
 }

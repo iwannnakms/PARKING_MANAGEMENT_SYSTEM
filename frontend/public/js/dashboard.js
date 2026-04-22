@@ -14,20 +14,26 @@ class ParkSyncState {
     this.currentUser = null;
     this.token = null;
     this.currentView = null;
-    this.activeTab = 'main';
+    this.activeTab = 'main'; 
+    this.guardMode = 'checkin';
   }
 
   syncUI() {
-    console.log(`[ParkSync] Triggering UI Sync for View: ${this.currentView}`);
-    if (this.currentView === 'admin' && typeof renderAdmin === 'function') renderAdmin();
-    if (this.currentView === 'customer' && typeof renderCustomer === 'function') renderCustomer();
-    if (this.currentView === 'guard' && typeof renderGuard === 'function') renderGuard();
+    console.log(`[ParkSync] Triggering UI Sync for: ${this.currentView}`);
+    try {
+      if (this.currentView === 'admin' && typeof renderAdmin === 'function') renderAdmin();
+      if (this.currentView === 'customer' && typeof renderCustomer === 'function') renderCustomer();
+      if (this.currentView === 'guard' && typeof renderGuard === 'function') renderGuard();
+    } catch (e) {
+      console.error('[ParkSync] Sync Error:', e);
+    }
   }
 }
 
 const GlobalState = new ParkSyncState();
 
 document.addEventListener('DOMContentLoaded', async () => {
+  console.log('[ParkSync] Booting Terminal...');
   const token = localStorage.getItem('token');
   const userStr = localStorage.getItem('user');
 
@@ -52,7 +58,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function switchRole(newRole) {
-  console.log(`[ParkSync] Switching Role to: ${newRole}`);
   GlobalState.currentView = newRole;
   GlobalState.activeTab = 'main';
   document.getElementById('role-display').innerText = newRole.toUpperCase();
@@ -66,7 +71,8 @@ const ICONS = {
   scanner: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h18a2 2 0 0 1 2 2z"></path><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>',
   settings: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle></svg>',
   user: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>',
-  history: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>'
+  history: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>',
+  logout: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="17 16 21 12 17 8"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>'
 };
 
 function buildSidebar(role) {
@@ -75,10 +81,9 @@ function buildSidebar(role) {
   const navItems = [];
   if (role === 'admin') {
     navItems.push({ id: 'main', label: 'Analytics', icon: ICONS.dashboard });
-    navItems.push({ id: 'map', label: 'Facility Map', icon: ICONS.grid });
   } else if (role === 'guard') {
-    navItems.push({ id: 'main', label: 'Scanner', icon: ICONS.scanner });
-    navItems.push({ id: 'map', label: 'Spot Monitor', icon: ICONS.grid });
+    navItems.push({ id: 'main', label: 'Entry Mode', icon: ICONS.scanner, sub: 'checkin' });
+    navItems.push({ id: 'main', label: 'Exit Mode', icon: ICONS.logout, sub: 'checkout' });
   } else {
     navItems.push({ id: 'main', label: 'Bookings', icon: ICONS.grid });
     navItems.push({ id: 'history', label: 'History', icon: ICONS.history });
@@ -87,12 +92,14 @@ function buildSidebar(role) {
   navItems.forEach(item => {
     const a = document.createElement('a');
     a.href = '#';
-    a.className = `nav-item ${GlobalState.activeTab === item.id ? 'active' : ''}`;
+    const isActive = (GlobalState.activeTab === item.id && (!item.sub || GlobalState.guardMode === item.sub));
+    a.className = `nav-item ${isActive ? 'active' : ''}`;
     a.innerHTML = `${item.icon}<span class="nav-text">${item.label}</span>`;
     a.onclick = (e) => {
       e.preventDefault();
       GlobalState.activeTab = item.id;
-      buildSidebar(GlobalState.currentView); // Refresh sidebar active state
+      if (item.sub) GlobalState.guardMode = item.sub;
+      buildSidebar(GlobalState.currentView);
       initDashboard();
     };
     sidebarMenu.appendChild(a);
@@ -100,37 +107,36 @@ function buildSidebar(role) {
 }
 
 async function initDashboard() {
-  if (!socket) {
-    console.log('[ParkSync] Connecting to Real-Time Node...');
-    socket = io('http://localhost:5001');
-    socket.on('connect', () => {
-      console.log('[ParkSync] Socket Connected');
-      document.querySelector('.status-dot').classList.add('green');
-    });
-    socket.on('spotUpdated', (data) => {
-      console.log('[ParkSync] Real-time Update Received:', data);
-      fetchData();
-    });
-    socket.on('disconnect', () => {
-      console.warn('[ParkSync] Socket Disconnected');
-      document.querySelector('.status-dot').classList.remove('green');
-    });
+  // Safety check for socket.io library
+  if (!socket && typeof io !== 'undefined') {
+    console.log('[ParkSync] Initializing Real-time Node...');
+    try {
+      socket = io('http://localhost:5001');
+      socket.on('connect', () => {
+        document.querySelector('.status-dot').classList.add('green');
+      });
+      socket.on('spotUpdated', () => fetchData());
+    } catch (e) {
+      console.warn('[ParkSync] Socket connection failed.');
+    }
   }
 
-  // Inject current view structure
-  if (GlobalState.currentView === 'admin' && typeof initAdmin === 'function') initAdmin();
-  if (GlobalState.currentView === 'customer' && typeof initCustomer === 'function') initCustomer();
-  if (GlobalState.currentView === 'guard' && typeof initGuard === 'function') initGuard();
+  // Inject Role Initializers
+  try {
+    if (GlobalState.currentView === 'admin' && typeof initAdmin === 'function') initAdmin();
+    if (GlobalState.currentView === 'customer' && typeof initCustomer === 'function') initCustomer();
+    if (GlobalState.currentView === 'guard' && typeof initGuard === 'function') initGuard();
+  } catch (e) {
+    console.error('[ParkSync] Initialization Crash:', e);
+  }
 
   await fetchData();
 }
 
 async function fetchData() {
-  console.log('[ParkSync] Synchronizing Data...');
+  console.log('[ParkSync] Refreshing Local State...');
   try {
     const headers = { 'Authorization': `Bearer ${GlobalState.token}` };
-    
-    // Always fetch spots
     const spotsRes = await fetch(`${API_BASE_URL}/bookings/spots`, { headers });
     const spotsData = await spotsRes.json();
     GlobalState.spots = spotsData.spots || [];
@@ -140,28 +146,29 @@ async function fetchData() {
       const statsData = await statsRes.json();
       GlobalState.stats = statsData;
       GlobalState.recentActivity = statsData.recentActivity || [];
-    } 
-    else if (GlobalState.currentView === 'customer') {
+    } else if (GlobalState.currentView === 'customer') {
       const [myBookingRes, historyRes] = await Promise.all([
         fetch(`${API_BASE_URL}/bookings/my-booking`, { headers }),
         fetch(`${API_BASE_URL}/bookings/history`, { headers })
       ]);
       const myBookingData = await myBookingRes.json();
       const historyData = await historyRes.json();
-      
       GlobalState.myBooking = myBookingData.booking;
       GlobalState.history = historyData.history || [];
-      
       GlobalState.stats = {
         availableSpots: GlobalState.spots.filter(s => s.status === 'Available').length,
         occupiedSpots: GlobalState.spots.filter(s => s.status === 'Occupied').length,
         bookedSpots: GlobalState.spots.filter(s => s.status === 'Booked').length,
       };
+    } else if (GlobalState.currentView === 'guard') {
+      const statsRes = await fetch(`${API_BASE_URL}/bookings/stats`, { headers });
+      const statsData = await statsRes.json();
+      GlobalState.stats = statsData;
+      GlobalState.recentActivity = statsData.recentActivity || [];
     }
-
     GlobalState.syncUI();
   } catch (err) {
-    console.error('[ParkSync] Data Sync Failed:', err);
+    console.error('[ParkSync] Data Synchronization Failed:', err);
   }
 }
 

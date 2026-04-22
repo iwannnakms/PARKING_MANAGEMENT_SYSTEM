@@ -22,10 +22,10 @@ function renderBookingView(mainContent) {
   const selectedSpotNum = getSelectedSpotNumber();
 
   mainContent.innerHTML = `
-    <div class="user-layout">
+    <div class="user-layout reveal visible">
       <div class="user-grid">
         <!-- New Booking Form -->
-        <div class="glass-card booking-form-container reveal visible">
+        <div class="glass-card booking-form-container">
           <div class="card-header">
             <h3>Configure Session</h3>
             <p>Select your parameters below</p>
@@ -43,6 +43,10 @@ function renderBookingView(mainContent) {
             ` : ''}
 
             <div class="input-row ${hasActive ? 'op-3' : ''}">
+              <div class="input-group">
+                <label class="static-label">Vehicle Registration</label>
+                <input type="text" id="vehicle-registration" class="custom-select" placeholder="e.g. ABC-1234" ${hasActive ? 'disabled' : ''} required>
+              </div>
               <div class="input-group">
                 <label class="static-label">Vehicle Type</label>
                 <select id="vehicle-type" class="custom-select" ${hasActive ? 'disabled' : ''}>
@@ -88,7 +92,7 @@ function renderBookingView(mainContent) {
         </div>
 
         <!-- Active Pass -->
-        <div class="glass-card active-booking-container reveal visible">
+        <div class="glass-card active-booking-container">
           <div class="card-header">
             <h3>Active Digital Pass</h3>
             <p>Authorized access token</p>
@@ -100,7 +104,7 @@ function renderBookingView(mainContent) {
       </div>
 
       <!-- Facility Map -->
-      <div class="glass-card mt-8 map-card reveal visible">
+      <div class="glass-card mt-8 map-card">
         <div class="card-header">
           <h3>Interactive Facility Map</h3>
           <div class="map-status">
@@ -109,9 +113,7 @@ function renderBookingView(mainContent) {
         </div>
         <p class="map-hint">Click on an <span class="text-green">Available</span> spot to select your coordinate</p>
         
-        <div id="customer-parking-grid" class="parking-grid mt-6">
-          <!-- Grid items injected here -->
-        </div>
+        <div id="customer-parking-grid" class="parking-grid mt-6"></div>
       </div>
     </div>
   `;
@@ -171,6 +173,7 @@ function selectSpotForBooking(spot) {
 async function handleNewBooking(e) {
   e.preventDefault();
   const vehicleType = document.getElementById('vehicle-type').value;
+  const vehicleRegistration = document.getElementById('vehicle-registration').value;
   const date = document.getElementById('booking-date').value;
   const time = document.getElementById('booking-time').value;
   const btn = document.getElementById('submit-booking-btn');
@@ -181,7 +184,12 @@ async function handleNewBooking(e) {
     const res = await fetch(`${API_BASE_URL}/bookings/book`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GlobalState.token}` },
-      body: JSON.stringify({ spotId: GlobalState.selectedSpotId, vehicleType, startTime: `${date}T${time}:00` })
+      body: JSON.stringify({ 
+        spotId: GlobalState.selectedSpotId, 
+        vehicleType, 
+        vehicleRegistration,
+        startTime: `${date}T${time}:00` 
+      })
     });
 
     const data = await res.json();
@@ -209,6 +217,7 @@ function updateActivePass() {
       <div class="active-pass-card reveal visible">
         <div class="qr-zone"><div id="active-pass-qr"></div></div>
         <div class="pass-details">
+          <div class="pass-row"><span class="l">Registration</span><span class="v">${myBooking.vehicleRegistration || '--'}</span></div>
           <div class="pass-row"><span class="l">Spot</span><span class="v">${myBooking.spot?.spotNumber || '--'}</span></div>
           <div class="pass-row"><span class="l">Status</span><span class="v badge-status ${myBooking.status.toLowerCase()}">${myBooking.status}</span></div>
           <div class="pass-row token-row"><span class="l">Token Hex</span><span class="v code-text">${myBooking.qrCodeToken}</span></div>
@@ -245,17 +254,18 @@ function renderHistoryView(mainContent) {
       <div class="table-wrapper mt-6">
         <table class="activity-table">
           <thead>
-            <tr><th>Date</th><th>Spot</th><th>Vehicle</th><th>Status</th></tr>
+            <tr><th>Date</th><th>Spot</th><th>Vehicle No.</th><th>Type</th><th>Status</th></tr>
           </thead>
           <tbody>
             ${history.map(item => `
               <tr>
                 <td>${new Date(item.createdAt).toLocaleDateString()}</td>
                 <td>${item.spot?.spotNumber || 'N/A'}</td>
+                <td>${item.vehicleRegistration || '--'}</td>
                 <td>${item.vehicleType || 'Car'}</td>
                 <td><span class="badge-status ${item.status.toLowerCase()}">${item.status}</span></td>
               </tr>
-            `).join('') || '<tr><td colspan="4" style="text-align:center; padding: 40px; opacity: 0.5;">No records found</td></tr>'}
+            `).join('') || '<tr><td colspan="5" style="text-align:center; padding: 40px; opacity: 0.5;">No records found</td></tr>'}
           </tbody>
         </table>
       </div>

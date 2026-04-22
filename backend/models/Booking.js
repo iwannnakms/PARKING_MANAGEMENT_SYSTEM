@@ -21,6 +21,10 @@ const bookingSchema = new mongoose.Schema({
     enum: ['Two-wheeler', 'Four-wheeler'],
     default: 'Four-wheeler',
   },
+  vehicleRegistration: {
+    type: String,
+    trim: true,
+  },
   duration: {
     type: Number, // in hours
     default: 1,
