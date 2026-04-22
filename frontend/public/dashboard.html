@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ParkSync - Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="http://localhost:5001/socket.io/socket.io.js"></script>
+</head>
+<body class="dashboard-body">
+  
+  <div class="dashboard-layout">
+    <!-- Glassmorphic Sidebar -->
+    <aside class="glass-sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-mark small">P</div>
+        <span class="logo-text">ParkSync</span>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+          <span class="nav-text">Command Center</span>
+        </a>
+        <a href="#" class="nav-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <span class="nav-text">Live Grid</span>
+        </a>
+        <a href="#" class="nav-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <span class="nav-text">Settings</span>
+        </a>
+      </nav>
+
+      <button class="collapse-btn" onclick="document.getElementById('sidebar').classList.toggle('collapsed')">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+    </aside>
+
+    <!-- Main Content Shell -->
+    <div class="main-wrapper">
+      
+      <!-- Top Navbar -->
+      <header class="glass-topbar">
+        <div class="topbar-left">
+          <h2>Overview</h2>
+        </div>
+        
+        <div class="topbar-right">
+          <!-- Role Badge w/ Socket Glowing Dot -->
+          <div class="role-badge">
+            <span class="status-dot"></span>
+            <span id="role-display">System Admin</span>
+          </div>
+          
+          <div class="user-profile">
+            <img src="https://ui-avatars.com/api/?name=Admin&background=818cf8&color=fff&bold=true" alt="Avatar" class="avatar">
+          </div>
+          
+          <button class="logout-btn" onclick="window.location.href='login.html'">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Content Area with Grid Pattern -->
+      <main class="content-area grid-pattern">
+        
+        <!-- Example Dashboard Cards inside the Shell -->
+        <div class="dashboard-widgets">
+          <div class="glass-card stat-card">
+            <h4>Live Revenue</h4>
+            <h2 class="gradient-text-blue">$14,020</h2>
+          </div>
+          <div class="glass-card stat-card">
+            <h4>Occupancy</h4>
+            <h2 class="gradient-text-purple">84%</h2>
+          </div>
+          <div class="glass-card stat-card">
+            <h4>Alerts</h4>
+            <h2 class="gradient-text-pink">0</h2>
+          </div>
+        </div>
+
+        <div class="glass-card mt-8" style="min-height: 400px; display: flex; align-items: center; justify-content: center;">
+          <h3 style="color: var(--text-muted); font-weight: 400;">[ Grid / Charts Area ]</h3>
+        </div>
+        
+      </main>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="js/customer.js"></script>
+  <script src="js/guard.js"></script>
+  <script src="js/admin.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

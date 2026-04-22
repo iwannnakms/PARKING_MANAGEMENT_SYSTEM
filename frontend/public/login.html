@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ParkSync - Premium Access</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="login-body">
+  
+  <!-- Glowing Orbs Background -->
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <div class="login-container glass-card">
+    <div class="login-header">
+      <div class="logo-mark">P</div>
+      <h1>ParkSync</h1>
+      <p>Secure authentication portal</p>
+    </div>
+
+    <!-- Interactive 3-way toggle -->
+    <div class="role-toggle">
+      <div class="toggle-slider"></div>
+      <!-- Note: Default active is Admin per design request focus, but can be any -->
+      <button class="toggle-btn active" data-role="admin">Admin</button>
+      <button class="toggle-btn" data-role="customer">Customer</button>
+      <button class="toggle-btn" data-role="guard">Guard</button>
+    </div>
+
+    <div class="forms-wrapper">
+      
+      <!-- Admin Form -->
+      <form id="form-admin" class="role-form active" onsubmit="handleLogin(event, 'admin')">
+        <div class="input-group">
+          <input type="email" id="admin-email" required autocomplete="off">
+          <label>Admin Email</label>
+        </div>
+        <div class="input-group">
+          <input type="password" id="admin-password" required autocomplete="off">
+          <label>Command Password</label>
+        </div>
+        <button type="submit" class="glow-btn">Initialize Dashboard</button>
+      </form>
+
+      <!-- Customer Form -->
+      <form id="form-customer" class="role-form" onsubmit="handleLogin(event, 'customer')">
+        <div class="input-group">
+          <input type="email" id="customer-email" required autocomplete="off">
+          <label>Customer Email</label>
+        </div>
+        <div class="input-group">
+          <input type="password" id="customer-password" required autocomplete="off">
+          <label>Password</label>
+        </div>
+        <button type="submit" class="glow-btn">Access Reservations</button>
+      </form>
+
+      <!-- Guard Form -->
+      <form id="form-guard" class="role-form" onsubmit="handleLogin(event, 'guard')">
+        <div class="input-group">
+          <input type="email" id="guard-email" required autocomplete="off">
+          <label>Guard ID / Email</label>
+        </div>
+        <div class="input-group">
+          <input type="password" id="guard-password" required autocomplete="off">
+          <label>Passcode</label>
+        </div>
+        <button type="submit" class="glow-btn">Engage Scanner</button>
+      </form>
+
+    </div>
+  </div>
+
+  <script src="js/login.js"></script>
+</body>
+</html>

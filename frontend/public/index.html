@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ParkSync | Future of Parking</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/landing.css">
+</head>
+<body>
+
+  <!-- Animated Background Elements -->
+  <div class="bg-container">
+    <div class="grid-overlay"></div>
+    <div class="glowing-orbs">
+      <div class="orb orb-primary"></div>
+      <div class="orb orb-secondary"></div>
+      <div class="orb orb-tertiary"></div>
+    </div>
+    <div class="scrolling-shapes">
+      <div class="shape"></div>
+      <div class="shape"></div>
+      <div class="shape"></div>
+    </div>
+  </div>
+
+  <main class="landing-wrapper">
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <div class="hero-content">
+        <div class="badge">Next-Gen Parking Management</div>
+        <h1>Effortless Parking <span class="gradient-text">Redefined.</span></h1>
+        <p>Experience the ultimate real-time parking ecosystem. Book spots instantly, scan and park with ease, and manage your facility with cutting-edge analytics.</p>
+        <div class="hero-cta">
+          <button class="btn-glow" onclick="toggleAuthModal()">Get Started Now</button>
+          <div class="stats-mini">
+            <div class="stat-item"><strong>50+</strong> <span>Live Spots</span></div>
+            <div class="stat-item"><strong>99%</strong> <span>Accuracy</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Integrated Auth Container (The Sliding Panel) -->
+    <div id="auth-overlay" class="auth-overlay hidden">
+      <div class="auth-container glass-card">
+        <button class="close-btn" onclick="toggleAuthModal()">&times;</button>
+        
+        <div class="auth-box">
+          <!-- Toggle Slider -->
+          <div class="auth-toggle">
+            <div id="toggle-bg" class="toggle-bg"></div>
+            <button class="toggle-btn active" id="btn-login" onclick="showAuthForm('login')">Login</button>
+            <button class="toggle-btn" id="btn-signup" onclick="showAuthForm('signup')">Sign Up</button>
+          </div>
+
+          <div class="forms-container">
+            <!-- Login Form -->
+            <form id="login-form" class="auth-form active">
+              <h2>Welcome Back</h2>
+              <p class="subtitle">Access your digital parking dashboard</p>
+              
+              <div class="input-group">
+                <input type="email" id="login-email" required>
+                <label>Email Address</label>
+              </div>
+              <div class="input-group">
+                <input type="password" id="login-password" required>
+                <label>Password</label>
+              </div>
+              
+              <button type="submit" class="btn-submit">Sign In <span class="arrow">→</span></button>
+              <div id="login-error" class="error-msg"></div>
+            </form>
+
+            <!-- Sign Up Form -->
+            <form id="signup-form" class="auth-form">
+              <h2>Create Account</h2>
+              <p class="subtitle">Join the ParkSync community today</p>
+              
+              <div class="input-group">
+                <input type="text" id="signup-name" required>
+                <label>Full Name</label>
+              </div>
+              <div class="input-group">
+                <input type="email" id="signup-email" required>
+                <label>Email Address</label>
+              </div>
+              <div class="input-group">
+                <input type="password" id="signup-password" required>
+                <label>Password</label>
+              </div>
+              
+              <button type="submit" class="btn-submit">Register <span class="arrow">→</span></button>
+              <div id="signup-error" class="error-msg"></div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/auth.js"></script>
+</body>
+</html>
