@@ -211,6 +211,7 @@ function updateActivePass() {
         <div class="pass-details">
           <div class="pass-row"><span class="l">Spot</span><span class="v">${myBooking.spot?.spotNumber || '--'}</span></div>
           <div class="pass-row"><span class="l">Status</span><span class="v badge-status ${myBooking.status.toLowerCase()}">${myBooking.status}</span></div>
+          <div class="pass-row token-row"><span class="l">Token Hex</span><span class="v code-text">${myBooking.qrCodeToken}</span></div>
           
           ${myBooking.status === 'Booked' ? `
             <div class="cancel-container mt-6">

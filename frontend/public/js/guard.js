@@ -22,11 +22,16 @@ function initGuard() {
             <div class="scanner-overlay-line"></div>
           </div>
 
-          <div class="manual-entry mt-6">
-            <label class="static-label">Manual Token Entry</label>
-            <div class="input-with-btn">
-              <input type="text" id="manual-token" placeholder="Enter Token Hex...">
-              <button class="small-glow-btn" onclick="verifyToken()">Verify</button>
+          <div class="manual-entry-container mt-8">
+            <div class="input-group">
+              <label class="static-label">Authentication Token</label>
+              <div class="premium-input-wrapper">
+                <input type="text" id="manual-token" placeholder="Enter 32-character hex token..." autocomplete="off">
+                <button class="verify-btn" onclick="verifyToken()">
+                  <span>Validate</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>
+              </div>
             </div>
           </div>
 
