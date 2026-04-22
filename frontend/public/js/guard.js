@@ -1,10 +1,24 @@
 // --- Guard Dashboard: Operations & Verification ---
 
-function initGuard() {
+let html5Scanner = null;
+
+async function initGuard() {
   const mainContent = document.getElementById('main-content');
   const viewTitle = document.getElementById('view-title');
   const mode = GlobalState.guardMode === 'checkin' ? "Entry Scanner" : "Exit Scanner";
   viewTitle.innerText = mode;
+
+  // CRITICAL: Properly stop existing scanner before replacing HTML
+  if (html5Scanner) {
+    try {
+      if (html5Scanner.isScanning) {
+        await html5Scanner.stop();
+      }
+    } catch (e) {
+      console.warn('[ParkSync] Scanner cleanup warning:', e);
+    }
+    html5Scanner = null;
+  }
 
   mainContent.innerHTML = `
     <div class="guard-layout reveal visible">
@@ -68,33 +82,32 @@ function initGuard() {
           <h3>Spot Monitor</h3>
           <p>Real-time bird's-eye view of all spots</p>
         </div>
-        <div id="guard-parking-grid" class="parking-grid mt-4">
-          <!-- Monitor spots injected here -->
-        </div>
+        <div id="guard-parking-grid" class="parking-grid mt-4"></div>
       </div>
 
       <!-- Recent Log -->
       <div class="glass-card mt-8">
         <h3>Terminal Validation Log</h3>
         <div class="log-wrapper mt-4">
-          <div id="guard-event-log" class="event-log">
-            <!-- Events injected here -->
-          </div>
+          <div id="guard-event-log" class="event-log"></div>
         </div>
       </div>
     </div>
   `;
 
   renderGuard();
-  startGuardScanner();
+  
+  // Small delay to ensure DOM is ready
+  setTimeout(() => {
+    startGuardScanner();
+  }, 100);
 }
 
 let guardSelectedSpotId = null;
 
 function renderGuard() {
-  const { stats, spots, recentActivity, guardMode } = GlobalState;
+  const { stats, spots, recentActivity } = GlobalState;
 
-  // 1. Render Monitor Grid
   const grid = document.getElementById('guard-parking-grid');
   if (grid) {
     grid.innerHTML = '';
@@ -108,7 +121,6 @@ function renderGuard() {
     });
   }
 
-  // 2. Update Log
   const log = document.getElementById('guard-event-log');
   if (log) {
     log.innerHTML = '';
@@ -130,35 +142,22 @@ function selectGuardSpot(spot) {
   const display = document.getElementById('guard-display-spot');
   const btnIn = document.getElementById('btn-force-checkin');
   const btnOut = document.getElementById('btn-force-checkout');
-
   if (display) display.innerText = spot.spotNumber;
   if (btnIn) btnIn.disabled = false;
   if (btnOut) btnOut.disabled = false;
-
   renderGuard();
 }
 
 async function triggerForce(action) {
   if (!guardSelectedSpotId) return;
-
   try {
     const res = await fetch(`${API_BASE_URL}/bookings/force`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GlobalState.token}`
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GlobalState.token}` },
       body: JSON.stringify({ spotId: guardSelectedSpotId, action })
     });
-
-    const contentType = res.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-       throw new Error("Server error: Endpoint returned invalid data.");
-    }
-
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
-
     showToast(`Force ${action} successful`, 'success');
     fetchData();
   } catch (err) {
@@ -166,38 +165,39 @@ async function triggerForce(action) {
   }
 }
 
-let html5Scanner;
 function startGuardScanner() {
   if (html5Scanner) return;
+  
   html5Scanner = new Html5Qrcode("guard-reader");
-  const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-  html5Scanner.start({ facingMode: "environment" }, config, (text) => {
-    document.getElementById('manual-token').value = text;
-    verifyToken(text);
-  }).catch(err => console.warn("Scanner Error:", err));
+  const config = { fps: 15, qrbox: { width: 250, height: 250 } };
+  
+  html5Scanner.start(
+    { facingMode: "environment" }, 
+    config, 
+    (text) => {
+      html5Scanner.pause(); // Pause to prevent double scans
+      document.getElementById('manual-token').value = text;
+      verifyToken(text);
+      setTimeout(() => html5Scanner.resume(), 3000);
+    }
+  ).catch(err => {
+    console.error("Scanner Error:", err);
+    // If start fails, ensure we nullify so user can try again
+    html5Scanner = null;
+  });
 }
 
 async function verifyToken(passedToken) {
   const token = passedToken || document.getElementById('manual-token').value;
   if (!token) return;
-
   const mode = GlobalState.guardMode; 
   
   try {
     const res = await fetch(`${API_BASE_URL}/bookings/validate-token`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GlobalState.token}`
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GlobalState.token}` },
       body: JSON.stringify({ qrCodeToken: token, mode })
     });
-
-    const contentType = res.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-       throw new Error("Validation node unreachable.");
-    }
-
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
 
