@@ -93,12 +93,26 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
       throw new Error(data.error || 'Registration failed');
     }
 
-    alert('Registration successful! You can now log in.');
-    showAuthForm('login');
-    document.getElementById('login-email').value = email;
+    // Success: Auto-Login immediately
+    submitBtn.innerText = 'Initializing Profile...';
     
-    submitBtn.disabled = false;
-    submitBtn.innerText = 'Register →';
+    const loginRes = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+
+    const loginData = await loginRes.json();
+    
+    if (loginRes.ok) {
+      localStorage.setItem('token', loginData.token);
+      localStorage.setItem('user', JSON.stringify(loginData.user));
+      window.location.href = 'dashboard.html';
+    } else {
+      // Fallback if auto-login fails for some reason
+      showAuthForm('login');
+      document.getElementById('login-email').value = email;
+    }
 
   } catch (err) {
     errorEl.innerText = err.message;
