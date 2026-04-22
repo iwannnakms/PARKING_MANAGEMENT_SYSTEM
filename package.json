@@ -1,9 +1,12 @@
 {
-  "name": "parking_management_system",
+  "name": "park-sync-premium",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Premium Real-Time Parking Management System",
+  "main": "backend/server.js",
   "scripts": {
+    "start": "node backend/server.js",
+    "dev": "nodemon backend/server.js",
+    "seed": "node seed.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
