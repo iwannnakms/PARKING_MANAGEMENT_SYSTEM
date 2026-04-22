@@ -10,7 +10,7 @@ class ParkSyncState {
     this.recentActivity = [];
     this.myBooking = null;
     this.history = [];
-    this.selectedSpotId = null; // NEW: Preserve selection
+    this.selectedSpotId = null;
     this.currentUser = null;
     this.token = null;
     this.currentView = null;
@@ -18,6 +18,7 @@ class ParkSyncState {
   }
 
   syncUI() {
+    console.log(`[ParkSync] Triggering UI Sync for View: ${this.currentView}`);
     if (this.currentView === 'admin' && typeof renderAdmin === 'function') renderAdmin();
     if (this.currentView === 'customer' && typeof renderCustomer === 'function') renderCustomer();
     if (this.currentView === 'guard' && typeof renderGuard === 'function') renderGuard();
@@ -51,6 +52,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function switchRole(newRole) {
+  console.log(`[ParkSync] Switching Role to: ${newRole}`);
   GlobalState.currentView = newRole;
   GlobalState.activeTab = 'main';
   document.getElementById('role-display').innerText = newRole.toUpperCase();
@@ -89,9 +91,8 @@ function buildSidebar(role) {
     a.innerHTML = `${item.icon}<span class="nav-text">${item.label}</span>`;
     a.onclick = (e) => {
       e.preventDefault();
-      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-      a.classList.add('active');
       GlobalState.activeTab = item.id;
+      buildSidebar(GlobalState.currentView); // Refresh sidebar active state
       initDashboard();
     };
     sidebarMenu.appendChild(a);
@@ -100,11 +101,23 @@ function buildSidebar(role) {
 
 async function initDashboard() {
   if (!socket) {
+    console.log('[ParkSync] Connecting to Real-Time Node...');
     socket = io('http://localhost:5001');
-    socket.on('connect', () => document.querySelector('.status-dot').classList.add('green'));
-    socket.on('spotUpdated', () => fetchData());
+    socket.on('connect', () => {
+      console.log('[ParkSync] Socket Connected');
+      document.querySelector('.status-dot').classList.add('green');
+    });
+    socket.on('spotUpdated', (data) => {
+      console.log('[ParkSync] Real-time Update Received:', data);
+      fetchData();
+    });
+    socket.on('disconnect', () => {
+      console.warn('[ParkSync] Socket Disconnected');
+      document.querySelector('.status-dot').classList.remove('green');
+    });
   }
 
+  // Inject current view structure
   if (GlobalState.currentView === 'admin' && typeof initAdmin === 'function') initAdmin();
   if (GlobalState.currentView === 'customer' && typeof initCustomer === 'function') initCustomer();
   if (GlobalState.currentView === 'guard' && typeof initGuard === 'function') initGuard();
@@ -113,10 +126,11 @@ async function initDashboard() {
 }
 
 async function fetchData() {
-  const grid = document.getElementById('customer-parking-grid');
+  console.log('[ParkSync] Synchronizing Data...');
   try {
     const headers = { 'Authorization': `Bearer ${GlobalState.token}` };
     
+    // Always fetch spots
     const spotsRes = await fetch(`${API_BASE_URL}/bookings/spots`, { headers });
     const spotsData = await spotsRes.json();
     GlobalState.spots = spotsData.spots || [];
@@ -147,31 +161,24 @@ async function fetchData() {
 
     GlobalState.syncUI();
   } catch (err) {
-    console.error('Data Sync Error:', err);
+    console.error('[ParkSync] Data Sync Failed:', err);
   }
 }
 
 async function cancelBooking(bookingId) {
-  // Use a custom confirmation logic if possible, or just proceed for better flow
   try {
     const res = await fetch(`${API_BASE_URL}/bookings/cancel`, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GlobalState.token}` 
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GlobalState.token}` },
       body: JSON.stringify({ bookingId })
     });
-    
     if (!res.ok) {
       const data = await res.json();
       throw new Error(data.error);
     }
-    
-    // Smooth transition: Fetch data and sync UI
     fetchData();
   } catch (err) {
-    console.error(err.message);
+    showToast(err.message, 'error');
   }
 }
 
@@ -180,24 +187,15 @@ function logout() {
   window.location.href = '/';
 }
 
-// Global Notification System
 function showToast(message, type = 'success') {
   const toast = document.getElementById('global-toast');
   if (!toast) return;
-
-  const icons = {
-    success: '✅',
-    error: '⚠️',
-    info: 'ℹ️'
-  };
-
+  const icons = { success: '✅', error: '⚠️', info: 'ℹ️' };
   toast.innerHTML = `<span>${icons[type] || ''}</span> <span>${message}</span>`;
   toast.className = `global-toast active ${type}`;
   toast.classList.remove('hidden');
-
   setTimeout(() => {
     toast.classList.remove('active');
     setTimeout(() => toast.classList.add('hidden'), 500);
   }, 4000);
 }
-

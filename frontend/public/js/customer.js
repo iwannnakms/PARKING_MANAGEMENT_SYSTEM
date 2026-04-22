@@ -19,6 +19,7 @@ function initCustomer() {
 function renderBookingView(mainContent) {
   const hasActive = !!GlobalState.myBooking;
   const activeSpotNum = GlobalState.myBooking?.spot?.spotNumber;
+  const selectedSpotNum = getSelectedSpotNumber();
 
   mainContent.innerHTML = `
     <div class="user-layout">
@@ -69,10 +70,10 @@ function renderBookingView(mainContent) {
               </div>
             </div>
             
-            <div id="selected-spot-display" class="selected-spot-banner mt-6 ${GlobalState.selectedSpotId ? '' : 'hidden'}">
+            <div id="selected-spot-display" class="selected-spot-banner mt-6">
               <div class="banner-info">
                 <span class="label">Assigned Coordinate</span>
-                <strong id="display-spot-number">${GlobalState.selectedSpotId ? getSelectedSpotNumber() : '--'}</strong>
+                <strong id="display-spot-number">${hasActive ? activeSpotNum : selectedSpotNum}</strong>
               </div>
               <div class="banner-price">
                 <span class="label">Fixed Rate</span>
@@ -80,8 +81,8 @@ function renderBookingView(mainContent) {
               </div>
             </div>
 
-            <button type="submit" id="submit-booking-btn" class="glow-btn mt-6" ${hasActive ? 'style="display:none;"' : (GlobalState.selectedSpotId ? '' : 'disabled')}>
-              Complete Reservation
+            <button type="submit" id="submit-booking-btn" class="glow-btn mt-6" ${hasActive ? 'disabled' : (GlobalState.selectedSpotId ? '' : 'disabled')}>
+              ${hasActive ? `${activeSpotNum} Booked` : `Book Spot ${selectedSpotNum}`}
             </button>
           </form>
         </div>
@@ -157,10 +158,8 @@ function renderCustomer() {
 
 function selectSpotForBooking(spot) {
   GlobalState.selectedSpotId = spot._id;
-  const banner = document.getElementById('selected-spot-display');
   const displayNum = document.getElementById('display-spot-number');
   const submitBtn = document.getElementById('submit-booking-btn');
-  if (banner) banner.classList.remove('hidden');
   if (displayNum) displayNum.innerText = spot.spotNumber;
   if (submitBtn) {
     submitBtn.disabled = false;
@@ -191,12 +190,6 @@ async function handleNewBooking(e) {
     showToast("Reservation Successful! Your digital pass is now active.", "success");
     
     GlobalState.selectedSpotId = null;
-    const displayNum = document.getElementById('display-spot-number');
-    if (displayNum) displayNum.innerText = '--';
-    if (btn) {
-      btn.innerText = 'Book Spot --';
-      btn.disabled = true;
-    }
     fetchData();
 
   } catch (err) {
@@ -223,7 +216,7 @@ function updateActivePass() {
             <div class="cancel-container mt-6">
               <button class="premium-cancel-btn" onclick="cancelBooking('${myBooking._id}')">
                 <span class="btn-text">Terminate Reservation</span>
-                <span class="btn-icon">✕</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
               </button>
               <p class="cancel-hint">Valid only before check-in</p>
             </div>
