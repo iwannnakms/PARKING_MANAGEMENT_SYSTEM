@@ -28,7 +28,7 @@
 
   <main class="landing-wrapper">
     <!-- Hero Section -->
-    <section class="hero-section">
+    <section class="hero-section reveal">
       <div class="hero-content">
         <div class="badge">Next-Gen Parking Management</div>
         <h1>Effortless Parking <span class="gradient-text">Redefined.</span></h1>
@@ -43,7 +43,74 @@
       </div>
     </section>
 
-    <!-- Integrated Auth Container (The Sliding Panel) -->
+    <!-- Features Section -->
+    <section class="features-section">
+      <div class="section-title reveal">
+        <div class="badge">Ecosystem</div>
+        <h2>Powerful Features for <span class="gradient-text">Everyone.</span></h2>
+      </div>
+      
+      <div class="features-grid">
+        <div class="feature-card glass-card reveal">
+          <div class="f-icon">🎯</div>
+          <h3>Real-Time Grid</h3>
+          <p>Instant visual feedback on spot availability. No more circling the lot.</p>
+        </div>
+        <div class="feature-card glass-card reveal">
+          <div class="f-icon">📱</div>
+          <h3>QR Access</h3>
+          <p>Seamless entry and exit using secure digital passes generated instantly.</p>
+        </div>
+        <div class="feature-card glass-card reveal">
+          <div class="f-icon">📊</div>
+          <h3>Smart Analytics</h3>
+          <p>Admin tools to track revenue, occupancy, and facility health in real-time.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section class="process-section">
+      <div class="section-title reveal">
+        <div class="badge">Workflow</div>
+        <h2>How ParkSync <span class="gradient-text">Works.</span></h2>
+      </div>
+
+      <div class="process-steps">
+        <div class="step-item reveal">
+          <div class="step-num">01</div>
+          <div class="step-info">
+            <h3>Register & Find</h3>
+            <p>Create an account and browse our live grid for available spots.</p>
+          </div>
+        </div>
+        <div class="step-item reveal">
+          <div class="step-num">02</div>
+          <div class="step-info">
+            <h3>Book & Pay</h3>
+            <p>Select your spot, confirm the mock payment, and get your QR code.</p>
+          </div>
+        </div>
+        <div class="step-item reveal">
+          <div class="step-num">03</div>
+          <div class="step-info">
+            <h3>Scan & Park</h3>
+            <p>Present your QR to the guard terminal and park in your reserved spot.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Final CTA Section -->
+    <section class="cta-section reveal">
+      <div class="glass-card cta-box">
+        <h2>Ready to optimize your parking?</h2>
+        <p>Join thousands of users enjoying the future of parking today.</p>
+        <button class="btn-glow" onclick="toggleAuthModal()">Initialize Access</button>
+      </div>
+    </section>
+
+    <!-- Integrated Auth Container -->
     <div id="auth-overlay" class="auth-overlay hidden">
       <div class="auth-container glass-card">
         <button class="close-btn" onclick="toggleAuthModal()">&times;</button>

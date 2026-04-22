@@ -1,234 +1,152 @@
-// --- Security Guard Dashboard Logic ---
+// --- Guard Dashboard: Operations & Verification ---
 
-async function initGuard(user, token, socket) {
-  const contentArea = document.querySelector('.content-area');
-  const topbarTitle = document.querySelector('.topbar-left h2');
-  topbarTitle.innerText = "Entry Scanner";
+function initGuard() {
+  const mainContent = document.getElementById('main-content');
+  const viewTitle = document.getElementById('view-title');
+  viewTitle.innerText = "Security Terminal";
 
-  contentArea.innerHTML = `
+  mainContent.innerHTML = `
     <div class="guard-layout">
-      <!-- Scanner Controls -->
-      <div class="glass-card scanner-container">
-        <div class="scanner-header">
-          <div class="scanner-badge">Secure Terminal</div>
-          <h3>QR Access Scanner</h3>
-          <p>Scan visitor's digital pass to authorize entry</p>
-        </div>
-
-        <div class="scanner-viewport">
-          <div id="reader" class="qr-reader-window"></div>
-          <div class="scanner-overlay">
-            <div class="scan-frame"></div>
+      <div class="guard-grid">
+        <!-- Scanner & Verification -->
+        <div class="glass-card scanner-panel">
+          <div class="scanner-header">
+            <h3>QR Verification</h3>
+            <div class="live-status">
+              <span class="status-dot green"></span> System Live
+            </div>
           </div>
-        </div>
-
-        <div id="scan-feedback" class="scan-feedback hidden">
-          <div class="feedback-icon"></div>
-          <div class="feedback-text">
-            <h4 id="feedback-title">Status</h4>
-            <p id="feedback-msg">Waiting for scan...</p>
+          
+          <div class="scanner-mock">
+            <div id="guard-reader" class="qr-reader-box"></div>
+            <div class="scanner-overlay-line"></div>
           </div>
+
+          <div class="manual-entry mt-6">
+            <label class="static-label">Manual Token Entry</label>
+            <div class="input-with-btn">
+              <input type="text" id="manual-token" placeholder="Enter Token Hex...">
+              <button class="small-glow-btn" onclick="verifyToken()">Verify</button>
+            </div>
+          </div>
+
+          <div id="verify-result" class="verify-feedback hidden"></div>
         </div>
 
-        <div class="scanner-actions">
-          <button id="btn-start-scanner" class="btn-submit" onclick="toggleScanner()">
-            Engage Camera
-          </button>
+        <!-- Real-time Status -->
+        <div class="glass-card status-panel">
+          <h3>Facility Status</h3>
+          <div class="status-metrics mt-4">
+            <div class="metric">
+              <span class="m-value" id="guard-cars-inside">0</span>
+              <span class="m-label">Vehicles Inside</span>
+            </div>
+          </div>
+          
+          <div class="quick-actions mt-8">
+            <h4>Quick Resolution</h4>
+            <div class="action-buttons">
+              <button class="action-btn checkin" onclick="triggerScanAction('checkin')">Force Check-In</button>
+              <button class="action-btn checkout" onclick="triggerScanAction('checkout')">Force Check-Out</button>
+            </div>
+            <p class="action-hint">Use only if scanner/token fails validation</p>
+          </div>
         </div>
       </div>
 
-      <!-- Live Log of recent scans -->
-      <div class="glass-card log-container mt-8">
-        <h3>Recent Validations</h3>
-        <div id="scan-log" class="scan-log">
-          <!-- Log items injected here -->
+      <!-- Recent Log -->
+      <div class="glass-card mt-8">
+        <h3>Terminal Event Log</h3>
+        <div class="log-wrapper mt-4">
+          <div id="guard-event-log" class="event-log">
+            <!-- Events injected here -->
+          </div>
         </div>
       </div>
     </div>
   `;
 
-  // Inject Guard-specific styles if not already present
-  injectGuardStyles();
+  renderGuard();
+  startGuardScanner();
 }
 
-let html5QrCode;
-let scannerActive = false;
+function renderGuard() {
+  const { stats, recentActivity } = GlobalState;
 
-async function toggleScanner() {
-  const btn = document.getElementById('btn-start-scanner');
-  const feedback = document.getElementById('scan-feedback');
+  // Update Counters
+  const carsInside = document.getElementById('guard-cars-inside');
+  if (carsInside) carsInside.innerText = stats.occupiedSpots || 0;
+
+  // Update Log
+  const log = document.getElementById('guard-event-log');
+  if (log) {
+    log.innerHTML = '';
+    recentActivity.slice(0, 5).forEach(act => {
+      const item = document.createElement('div');
+      item.className = 'log-entry';
+      const time = new Date(act.updatedAt).toLocaleTimeString();
+      item.innerHTML = `
+        <span class="time">${time}</span>
+        <span class="msg">Spot <strong>${act.spot?.spotNumber || 'N/A'}</strong> ${act.status} by ${act.user?.name || 'User'}</span>
+      `;
+      log.appendChild(item);
+    });
+  }
+}
+
+let html5Scanner;
+
+function startGuardScanner() {
+  if (html5Scanner) return;
+
+  html5Scanner = new Html5Qrcode("guard-reader");
+  const config = { fps: 10, qrbox: { width: 250, height: 250 } };
   
-  if (!scannerActive) {
-    btn.innerText = "Disengage Camera";
-    btn.style.background = "var(--space-darker)";
-    btn.style.border = "1px solid var(--neon-purple)";
-    
-    html5QrCode = new Html5Qrcode("reader");
-    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-
-    try {
-      await html5QrCode.start(
-        { facingMode: "environment" }, 
-        config,
-        onScanSuccess
-      );
-      scannerActive = true;
-      feedback.classList.remove('hidden');
-    } catch (err) {
-      alert("Camera access denied or not found.");
-      resetScannerUI();
+  html5Scanner.start(
+    { facingMode: "environment" }, 
+    config, 
+    (text) => {
+      document.getElementById('manual-token').value = text;
+      verifyToken(text);
     }
-  } else {
-    stopScanner();
-  }
+  ).catch(err => console.warn("Scanner Error:", err));
 }
 
-async function stopScanner() {
-  if (html5QrCode) {
-    await html5QrCode.stop();
-  }
-  resetScannerUI();
-}
+async function verifyToken(passedToken) {
+  const token = passedToken || document.getElementById('manual-token').value;
+  const feedback = document.getElementById('verify-result');
 
-function resetScannerUI() {
-  const btn = document.getElementById('btn-start-scanner');
-  btn.innerText = "Engage Camera";
-  btn.style.background = "var(--primary)";
-  btn.style.border = "none";
-  scannerActive = false;
-}
+  if (!token) return;
 
-async function onScanSuccess(decodedText, decodedResult) {
-  // Briefly stop to process
-  await html5QrCode.pause();
+  feedback.classList.remove('hidden', 'success', 'error');
+  feedback.innerText = "Verifying Token...";
   
-  const token = localStorage.getItem('token');
-  const feedback = document.getElementById('scan-feedback');
-  const feedbackTitle = document.getElementById('feedback-title');
-  const feedbackMsg = document.getElementById('feedback-msg');
-
-  feedback.className = "scan-feedback processing";
-  feedbackTitle.innerText = "Verifying...";
-  feedbackMsg.innerText = "Authenticating token with central server";
-
   try {
     const res = await fetch(`${API_BASE_URL}/bookings/scan`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${GlobalState.token}`
       },
-      body: JSON.stringify({ qrCodeToken: decodedText })
+      body: JSON.stringify({ qrCodeToken: token })
     });
 
     const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
 
-    if (!res.ok) {
-      throw new Error(data.error);
-    }
-
-    // Success Check-in
-    feedback.className = "scan-feedback success";
-    feedbackTitle.innerText = "Access Granted";
-    feedbackMsg.innerText = `Spot ${data.spotNumber} authorized for entry.`;
+    feedback.classList.add('success');
+    feedback.innerText = `Success! Authorized Spot ${data.spotNumber}`;
     
-    addToLog(data.spotNumber, "SUCCESS");
-
-    // Auto-resume after 2 seconds
-    setTimeout(() => {
-      feedback.className = "scan-feedback hidden";
-      html5QrCode.resume();
-    }, 2500);
+    // Refresh Global State
+    fetchData();
 
   } catch (err) {
-    feedback.className = "scan-feedback error";
-    feedbackTitle.innerText = "Access Denied";
-    feedbackMsg.innerText = err.message;
-    
-    addToLog("ERR", "DENIED");
-
-    setTimeout(() => {
-      feedback.className = "scan-feedback hidden";
-      html5QrCode.resume();
-    }, 3000);
+    feedback.classList.add('error');
+    feedback.innerText = `Error: ${err.message}`;
   }
 }
 
-function addToLog(spot, status) {
-  const log = document.getElementById('scan-log');
-  const time = new Date().toLocaleTimeString();
-  const logItem = document.createElement('div');
-  logItem.className = 'log-item';
-  logItem.innerHTML = `
-    <span class="log-time">${time}</span>
-    <span class="log-spot">Spot ${spot}</span>
-    <span class="log-status status-${status.toLowerCase()}">${status}</span>
-  `;
-  log.prepend(logItem);
-}
-
-function injectGuardStyles() {
-  if (document.getElementById('guard-styles')) return;
-  const style = document.createElement('style');
-  style.id = 'guard-styles';
-  style.innerHTML = `
-    .scanner-container { max-width: 600px; margin: 0 auto; text-align: center; }
-    .scanner-header { margin-bottom: 32px; }
-    .scanner-badge { 
-      display: inline-block; padding: 4px 12px; background: rgba(129, 140, 248, 0.1); 
-      border: 1px solid var(--neon-purple); border-radius: 100px; color: var(--neon-purple);
-      font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 12px;
-    }
-    
-    .scanner-viewport { 
-      position: relative; width: 100%; aspect-ratio: 4/3; background: #000; 
-      border-radius: 24px; overflow: hidden; margin-bottom: 24px;
-      border: 1px solid var(--glass-border);
-    }
-    
-    .qr-reader-window { width: 100%; height: 100%; }
-    
-    .scanner-overlay {
-      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      display: flex; align-items: center; justify-content: center; pointer-events: none;
-    }
-    
-    .scan-frame {
-      width: 250px; height: 250px; border: 2px solid var(--neon-blue);
-      border-radius: 20px; box-shadow: 0 0 20px rgba(56, 189, 248, 0.3), 0 0 0 1000px rgba(0,0,0,0.5);
-      position: relative;
-    }
-    
-    .scan-frame::after {
-      content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px;
-      background: var(--neon-blue); box-shadow: 0 0 15px var(--neon-blue);
-      animation: scanLine 2s linear infinite;
-    }
-    
-    @keyframes scanLine {
-      0% { top: 0; }
-      100% { top: 100%; }
-    }
-    
-    .scan-feedback {
-      padding: 20px; border-radius: 16px; margin-bottom: 24px;
-      display: flex; align-items: center; gap: 16px; text-align: left;
-      transition: all 0.3s var(--ease-out);
-    }
-    
-    .scan-feedback.processing { background: rgba(56, 189, 248, 0.1); border: 1px solid var(--neon-blue); }
-    .scan-feedback.success { background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; }
-    .scan-feedback.error { background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; }
-    
-    .log-item {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.05);
-    }
-    .log-time { color: var(--text-muted); font-size: 13px; }
-    .log-spot { font-weight: 600; }
-    .log-status { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 6px; }
-    .status-success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-    .status-denied { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
-  `;
-  document.head.appendChild(style);
+function triggerScanAction(type) {
+  // Simplified for prototype: Usually would require a selected spot
+  alert(`Manual ${type} triggered. Select a spot from the Facility Map (Coming Soon).`);
 }

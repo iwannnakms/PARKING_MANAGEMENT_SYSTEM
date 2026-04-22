@@ -16,6 +16,15 @@ const bookingSchema = new mongoose.Schema({
     enum: ['Booked', 'Checked-In', 'Completed', 'Cancelled'],
     default: 'Booked',
   },
+  vehicleType: {
+    type: String,
+    enum: ['Two-wheeler', 'Four-wheeler'],
+    default: 'Four-wheeler',
+  },
+  duration: {
+    type: Number, // in hours
+    default: 1,
+  },
   qrCodeToken: {
     type: String,
     unique: true,

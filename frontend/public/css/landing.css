@@ -296,13 +296,22 @@ p {
 .input-group input {
   width: 100%;
   padding: 12px 0;
-  background: none;
+  background: transparent !important;
   border: none;
   border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-  color: white;
+  color: white !important;
   font-size: 16px;
   outline: none;
   transition: border-color 0.3s;
+}
+
+/* Fix for Browser Autofill / Past Suggestions White Background */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: white !important;
+  -webkit-box-shadow: 0 0 0px 1000px #111827 inset !important;
+  transition: background-color 5000s ease-in-out 0s;
 }
 
 .input-group label {
@@ -355,13 +364,127 @@ p {
   font-weight: 500;
 }
 
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
+/* ================= NEW SCROLL SECTIONS ================= */
+section {
+  padding: 120px 10%;
+  min-height: auto;
 }
 
-@media (max-width: 768px) {
-  h1 { font-size: 48px; }
-  .hero-section { padding: 0 5%; }
-  .auth-container { padding: 32px; }
+.section-title {
+  text-align: center;
+  margin-bottom: 80px;
 }
+
+.section-title h2 {
+  font-size: 48px;
+  font-weight: 700;
+  margin-top: 16px;
+}
+
+/* Features Grid */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 32px;
+}
+
+.feature-card {
+  padding: 48px;
+  text-align: left;
+  transition: all 0.4s var(--ease);
+}
+
+.feature-card:hover {
+  transform: translateY(-10px);
+  border-color: var(--primary);
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.f-icon {
+  font-size: 40px;
+  margin-bottom: 24px;
+}
+
+.feature-card h3 {
+  font-size: 24px;
+  margin-bottom: 16px;
+}
+
+/* Process Steps */
+.process-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 60px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+}
+
+.step-num {
+  font-size: 64px;
+  font-weight: 800;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--primary);
+  opacity: 0.5;
+}
+
+.step-info h3 {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+/* Final CTA */
+.cta-section {
+  text-align: center;
+  padding-bottom: 160px;
+}
+
+.cta-box {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 80px;
+}
+
+.cta-box h2 {
+  font-size: 48px;
+  margin-bottom: 24px;
+}
+
+.cta-box p {
+  margin-bottom: 40px;
+}
+
+/* ================= REVEAL ANIMATIONS ================= */
+.reveal {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: all 1s var(--ease);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Smooth Scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-dark); }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+
+@media (max-width: 768px) {
+  section { padding: 80px 5%; }
+  .step-item { flex-direction: column; gap: 20px; text-align: center; }
+  .section-title h2, .cta-box h2 { font-size: 32px; }
+}
+

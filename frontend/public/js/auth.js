@@ -56,11 +56,8 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
       throw new Error(data.error || 'Login failed');
     }
 
-    // Success: Store Token and User info
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
-
-    // Redirect based on role
     window.location.href = 'dashboard.html';
 
   } catch (err) {
@@ -96,7 +93,6 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
       throw new Error(data.error || 'Registration failed');
     }
 
-    // Successfully registered, auto-switch to login
     alert('Registration successful! You can now log in.');
     showAuthForm('login');
     document.getElementById('login-email').value = email;
@@ -110,3 +106,27 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
     submitBtn.innerText = 'Register →';
   }
 });
+
+// --- Scroll Reveal Logic ---
+document.addEventListener('DOMContentLoaded', () => {
+  const revealElements = document.querySelectorAll('.reveal');
+
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      } else {
+        // Remove class when scrolled out to allow re-animation
+        entry.target.classList.remove('visible');
+      }
+    });
+  }, {
+    threshold: 0.1, // Trigger slightly earlier for smoother flow
+    rootMargin: "0px 0px -50px 0px" // Add offset so it doesn't trigger at the very bottom edge
+  });
+
+  revealElements.forEach(el => {
+    revealObserver.observe(el);
+  });
+});
+
