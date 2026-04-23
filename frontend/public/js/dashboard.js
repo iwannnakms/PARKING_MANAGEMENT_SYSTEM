@@ -70,11 +70,10 @@ function buildSidebar(role) {
   const navItems = [];
   if (role === 'admin') {
     navItems.push({ id: 'main', label: 'Analytics', icon: ICONS.dashboard });
-    navItems.push({ id: 'map', label: 'Facility Map', icon: ICONS.grid });
   } else if (role === 'guard') {
     navItems.push({ id: 'main', label: 'Entry Mode', icon: ICONS.scanner, sub: 'checkin' });
     navItems.push({ id: 'main', label: 'Exit Mode', icon: ICONS.logout, sub: 'checkout' });
-    navItems.push({ id: 'map', label: 'Spot Monitor', icon: ICONS.grid });
+
   } else {
     navItems.push({ id: 'main', label: 'Bookings', icon: ICONS.grid });
     navItems.push({ id: 'history', label: 'History', icon: ICONS.history });
