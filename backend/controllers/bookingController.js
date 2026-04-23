@@ -1,43 +1,51 @@
 const Spot = require('../models/Spot');
 const Booking = require('../models/Booking');
 const crypto = require('crypto');
+const Razorpay = require('razorpay');
 
-// Get all spots (Accessible by all authenticated users)
-exports.getSpots = async (req, res) => {
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET
+});
+
+// Create Razorpay Order
+exports.createOrder = async (req, res) => {
   try {
-    const spots = await Spot.find().sort({ spotNumber: 1 });
-    res.status(200).json({ spots });
+    const amount = 10 * 100; // Amount in paise ($10)
+    const options = {
+      amount,
+      currency: 'INR', // Using INR as Razorpay test keys usually default to this
+      receipt: `receipt_${Date.now()}`
+    };
+
+    const order = await razorpay.orders.create(options);
+    res.status(200).json({ order });
   } catch (error) {
-    console.error('Get Spots Error:', error);
-    res.status(500).json({ error: 'Internal server error fetching spots' });
+    console.error('Create Order Error:', error);
+    res.status(500).json({ error: 'Failed to create payment order' });
   }
 };
 
-// Get current user's active booking
-exports.getMyBooking = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const booking = await Booking.findOne({ 
-      user: userId, 
-      status: { $in: ['Booked', 'Checked-In'] } 
-    }).populate('spot');
-
-    res.status(200).json({ booking });
-  } catch (error) {
-    console.error('Get My Booking Error:', error);
-    res.status(500).json({ error: 'Internal server error fetching your booking' });
-  }
-};
-
-// Book a spot (Customer only)
+// Book a spot (Customer only) - Modified to verify payment
 exports.bookSpot = async (req, res) => {
   try {
-    const { spotId, vehicleType, vehicleRegistration, startTime } = req.body;
+    const { spotId, vehicleType, vehicleRegistration, startTime, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
     const userId = req.user.userId;
 
     if (!spotId) return res.status(400).json({ error: 'Spot ID is required' });
 
-    // NEW: Check if user already has an active booking
+    // Verify Razorpay Signature
+    const body = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+      .update(body.toString())
+      .digest('hex');
+
+    if (expectedSignature !== razorpay_signature) {
+      return res.status(400).json({ error: 'Invalid payment signature. Transaction rejected.' });
+    }
+
+    // Check if user already has an active booking
     const activeBooking = await Booking.findOne({ 
       user: userId, 
       status: { $in: ['Booked', 'Checked-In'] } 
@@ -67,6 +75,7 @@ exports.bookSpot = async (req, res) => {
       vehicleRegistration: vehicleRegistration || 'N/A',
       startTime: startTime ? new Date(startTime) : Date.now()
     });
+
     await newBooking.save();
     updatedSpot.currentBookingId = newBooking._id;
     await updatedSpot.save();
@@ -85,166 +94,130 @@ exports.bookSpot = async (req, res) => {
   }
 };
 
-// Cancel a booking (Customer only)
-exports.cancelBooking = async (req, res) => {
+// ... Rest of controllers (Get spots, My Booking, History, etc.)
+exports.getSpots = async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const { bookingId } = req.body;
-
-    const booking = await Booking.findOne({ _id: bookingId, user: userId, status: 'Booked' }).populate('spot');
-    
-    if (!booking) {
-      return res.status(404).json({ error: 'Active booking not found or cannot be cancelled.' });
-    }
-
-    const spot = booking.spot;
-    booking.status = 'Cancelled';
-    spot.status = 'Available';
-    spot.currentBookingId = null;
-
-    await booking.save();
-    await spot.save();
-
-    req.io.emit('spotUpdated', { spotId: spot._id, spotNumber: spot.spotNumber, status: spot.status });
-    res.status(200).json({ message: 'Booking cancelled successfully' });
+    const spots = await Spot.find().sort({ spotNumber: 1 });
+    res.status(200).json({ spots });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// Get User Booking History
+exports.getMyBooking = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const booking = await Booking.findOne({ user: userId, status: { $in: ['Booked', 'Checked-In'] } }).populate('spot');
+    res.status(200).json({ booking });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.cancelBooking = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { bookingId } = req.body;
+    const booking = await Booking.findOne({ _id: bookingId, user: userId, status: 'Booked' }).populate('spot');
+    if (!booking) return res.status(404).json({ error: 'Booking not found.' });
+    const spot = booking.spot;
+    booking.status = 'Cancelled';
+    spot.status = 'Available';
+    spot.currentBookingId = null;
+    await booking.save();
+    await spot.save();
+    req.io.emit('spotUpdated', { spotId: spot._id, spotNumber: spot.spotNumber, status: spot.status });
+    res.status(200).json({ message: 'Cancelled' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 exports.getUserHistory = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const history = await Booking.find({ user: userId })
-      .sort({ createdAt: -1 })
-      .populate('spot', 'spotNumber');
-
+    const history = await Booking.find({ user: userId }).sort({ createdAt: -1 }).populate('spot');
     res.status(200).json({ history });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// Unified Token Validation (Check-in/Check-out)
 exports.validateToken = async (req, res) => {
   try {
     const { qrCodeToken, mode } = req.body;
-    
     if (mode === 'checkin') {
       const booking = await Booking.findOne({ qrCodeToken, status: 'Booked' }).populate('spot');
-      if (!booking) return res.status(404).json({ error: 'No active booking found for this token.' });
-      
+      if (!booking) return res.status(404).json({ error: 'No active booking.' });
       booking.status = 'Checked-In';
       booking.spot.status = 'Occupied';
       await booking.save();
       await booking.spot.save();
-
       req.io.emit('spotUpdated', { spotId: booking.spot._id, spotNumber: booking.spot.spotNumber, status: 'Occupied', booking });
-      return res.status(200).json({ message: 'Check-in successful', spotNumber: booking.spot.spotNumber });
+      return res.status(200).json({ message: 'Checked-In' });
     } else {
       const booking = await Booking.findOne({ qrCodeToken, status: 'Checked-In' }).populate('spot');
-      if (!booking) return res.status(404).json({ error: 'No vehicle found inside with this token.' });
-      
+      if (!booking) return res.status(404).json({ error: 'No vehicle inside.' });
       booking.status = 'Completed';
       booking.endTime = Date.now();
       booking.spot.status = 'Available';
       booking.spot.currentBookingId = null;
       await booking.save();
       await booking.spot.save();
-
       req.io.emit('spotUpdated', { spotId: booking.spot._id, spotNumber: booking.spot.spotNumber, status: 'Available', booking });
-      return res.status(200).json({ message: 'Check-out successful', spotNumber: booking.spot.spotNumber });
+      return res.status(200).json({ message: 'Checked-Out' });
     }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// Force Action (Guard only - bypass QR)
 exports.forceAction = async (req, res) => {
   try {
     const { spotId, action } = req.body;
     const spot = await Spot.findById(spotId);
     if (!spot) return res.status(404).json({ error: 'Spot not found' });
-
     let booking;
     if (action === 'checkin') {
       spot.status = 'Occupied';
       booking = await Booking.findOne({ spot: spotId, status: 'Booked' });
-      if (booking) {
-        booking.status = 'Checked-In';
-        await booking.save();
-      }
+      if (booking) { booking.status = 'Checked-In'; await booking.save(); }
     } else {
       spot.status = 'Available';
       spot.currentBookingId = null;
       booking = await Booking.findOne({ spot: spotId, status: 'Checked-In' });
-      if (booking) {
-        booking.status = 'Completed';
-        booking.endTime = Date.now();
-        await booking.save();
-      }
+      if (booking) { booking.status = 'Completed'; booking.endTime = Date.now(); await booking.save(); }
     }
-
     await spot.save();
     req.io.emit('spotUpdated', { spotId: spot._id, spotNumber: spot.spotNumber, status: spot.status, booking });
-    res.status(200).json({ message: `Force ${action} successful` });
+    res.status(200).json({ message: 'Force Success' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
-// Get Recent Activity Log (Admin & Guard)
 exports.getRecentActivity = async (req, res) => {
   try {
-    const activity = await Booking.find()
-      .sort({ updatedAt: -1 })
-      .limit(15)
-      .populate('user', 'name')
-      .populate('spot', 'spotNumber');
-
+    const activity = await Booking.find().sort({ updatedAt: -1 }).limit(15).populate('user').populate('spot');
     res.status(200).json({ activity });
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error fetching activity' });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// Get Admin Stats (Admin only)
 exports.getAdminStats = async (req, res) => {
   try {
     const totalSpots = await Spot.countDocuments();
     const availableSpots = await Spot.countDocuments({ status: 'Available' });
     const bookedSpots = await Spot.countDocuments({ status: 'Booked' });
     const occupiedSpots = await Spot.countDocuments({ status: 'Occupied' });
-    
     const checkInCount = await Booking.countDocuments({ status: { $in: ['Checked-In', 'Completed'] } });
     const totalRevenue = checkInCount * 10;
-
-    const startOfDay = new Date();
-    startOfDay.setHours(0,0,0,0);
-    const dailyCheckins = await Booking.countDocuments({ 
-      status: 'Checked-In', 
-      updatedAt: { $gte: startOfDay } 
-    });
-
-    const recentActivity = await Booking.find()
-      .sort({ updatedAt: -1 })
-      .limit(10)
-      .populate('user', 'name')
-      .populate('spot', 'spotNumber');
-
-    res.status(200).json({
-      totalSpots,
-      availableSpots,
-      bookedSpots,
-      occupiedSpots,
-      totalRevenue,
-      dailyCheckins,
-      recentActivity
-    });
+    const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
+    const dailyCheckins = await Booking.countDocuments({ status: 'Checked-In', updatedAt: { $gte: startOfDay } });
+    const recentActivity = await Booking.find().sort({ updatedAt: -1 }).limit(10).populate('user').populate('spot');
+    res.status(200).json({ totalSpots, availableSpots, bookedSpots, occupiedSpots, totalRevenue, dailyCheckins, recentActivity });
   } catch (error) {
-    console.error('Admin Stats Error:', error);
-    res.status(500).json({ error: 'Internal server error fetching stats' });
+    res.status(500).json({ error: error.message });
   }
 };

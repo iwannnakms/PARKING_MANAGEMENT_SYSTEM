@@ -9,6 +9,9 @@ router.get('/spots', verifyToken, bookingController.getSpots);
 // Get current user's active booking
 router.get('/my-booking', verifyToken, bookingController.getMyBooking);
 
+// Create Razorpay Order
+router.post('/create-order', verifyToken, requireRole('customer'), bookingController.createOrder);
+
 // Get user booking history
 router.get('/history', verifyToken, bookingController.getUserHistory);
 

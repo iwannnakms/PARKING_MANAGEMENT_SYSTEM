@@ -70,6 +70,7 @@ function renderBookingView(mainContent) {
                   <option value="14:00">02:00 PM</option>
                   <option value="16:00">04:00 PM</option>
                   <option value="18:00">06:00 PM</option>
+                  <option value="20:00">08:00 PM</option>
                 </select>
               </div>
             </div>
@@ -77,7 +78,7 @@ function renderBookingView(mainContent) {
             <div id="selected-spot-display" class="selected-spot-banner mt-6">
               <div class="banner-info">
                 <span class="label">Assigned Coordinate</span>
-                <strong id="display-spot-number">${hasActive ? activeSpotNum : selectedSpotNum}</strong>
+                <strong id="display-spot-number">${hasActive ? (activeSpotNum || '--') : selectedSpotNum}</strong>
               </div>
               <div class="banner-price">
                 <span class="label">Fixed Rate</span>
@@ -179,30 +180,76 @@ async function handleNewBooking(e) {
   const btn = document.getElementById('submit-booking-btn');
 
   btn.disabled = true;
+  btn.innerText = "Initializing Payment...";
 
   try {
-    const res = await fetch(`${API_BASE_URL}/bookings/book`, {
+    // 1. Create Razorpay Order
+    const orderRes = await fetch(`${API_BASE_URL}/bookings/create-order`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GlobalState.token}` },
-      body: JSON.stringify({ 
-        spotId: GlobalState.selectedSpotId, 
-        vehicleType, 
-        vehicleRegistration,
-        startTime: `${date}T${time}:00` 
-      })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GlobalState.token}` }
     });
+    const orderData = await orderRes.json();
+    if (!orderRes.ok) throw new Error(orderData.error);
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    // 2. Open Razorpay Checkout
+    const options = {
+      key: 'rzp_test_SgsIzX6vUkYnwU', // Use the provided test key
+      amount: orderData.order.amount,
+      currency: orderData.order.currency,
+      name: 'ParkSync Premium',
+      description: `Spot ${getSelectedSpotNumber()} Reservation`,
+      order_id: orderData.order.id,
+      handler: async function (response) {
+        btn.innerText = "Securing Spot...";
+        // 3. Complete Booking with Payment Details
+        try {
+          const bookRes = await fetch(`${API_BASE_URL}/bookings/book`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GlobalState.token}` },
+            body: JSON.stringify({ 
+              spotId: GlobalState.selectedSpotId, 
+              vehicleType, 
+              vehicleRegistration,
+              startTime: `${date}T${time}:00`,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
+            })
+          });
 
-    showToast("Reservation Successful! Your digital pass is now active.", "success");
-    
-    GlobalState.selectedSpotId = null;
-    fetchData();
+          const bookData = await bookRes.json();
+          if (!bookRes.ok) throw new Error(bookData.error);
+
+          showToast("Reservation Successful! Your digital pass is now active.", "success");
+          GlobalState.selectedSpotId = null;
+          fetchData();
+        } catch (err) {
+          showToast(err.message, "error");
+          btn.disabled = false;
+          btn.innerText = `Book Spot ${getSelectedSpotNumber()}`;
+        }
+      },
+      prefill: {
+        name: GlobalState.currentUser.name,
+        email: GlobalState.currentUser.email
+      },
+      theme: { color: "#6366f1" },
+      modal: {
+        ondismiss: function() {
+          btn.disabled = false;
+          btn.innerText = `Book Spot ${getSelectedSpotNumber()}`;
+          showToast("Payment cancelled.", "info");
+        }
+      }
+    };
+
+    const rzp = new Razorpay(options);
+    rzp.open();
 
   } catch (err) {
     showToast(err.message, "error");
     btn.disabled = false;
+    btn.innerText = `Book Spot ${getSelectedSpotNumber()}`;
   }
 }
 
