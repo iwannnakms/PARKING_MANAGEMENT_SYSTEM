@@ -46,6 +46,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   GlobalState.currentUser = JSON.parse(userStr);
   GlobalState.currentView = GlobalState.currentUser.role;
 
+  const switcher = document.getElementById('dev-role-switcher');
+  if (switcher) switcher.value = GlobalState.currentView;
+  
   document.getElementById('role-display').innerText = GlobalState.currentUser.role.toUpperCase();
   const avatar = document.querySelector('.avatar');
   avatar.src = `https://ui-avatars.com/api/?name=${GlobalState.currentUser.name}&background=6366f1&color=fff&bold=true`;
@@ -63,18 +66,19 @@ const ICONS = {
   history: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>',
   logout: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="17 16 21 12 17 8"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>'
 };
+
 function buildSidebar(role) {
   const sidebarMenu = document.getElementById('sidebar-menu');
   if (!sidebarMenu) return; // Mobile safety
   sidebarMenu.innerHTML = '';
-...
   const navItems = [];
   if (role === 'admin') {
     navItems.push({ id: 'main', label: 'Analytics', icon: ICONS.dashboard });
+    navItems.push({ id: 'map', label: 'Facility Map', icon: ICONS.grid });
   } else if (role === 'guard') {
     navItems.push({ id: 'main', label: 'Entry Mode', icon: ICONS.scanner, sub: 'checkin' });
     navItems.push({ id: 'main', label: 'Exit Mode', icon: ICONS.logout, sub: 'checkout' });
-
+    navItems.push({ id: 'map', label: 'Spot Monitor', icon: ICONS.grid });
   } else {
     navItems.push({ id: 'main', label: 'Bookings', icon: ICONS.grid });
     navItems.push({ id: 'history', label: 'History', icon: ICONS.history });
@@ -98,16 +102,21 @@ function buildSidebar(role) {
 }
 
 async function initDashboard() {
+  // Safety check for socket.io library
   if (!socket && typeof io !== 'undefined') {
+    console.log('[ParkSync] Initializing Real-time Node...');
     try {
       socket = io();
-      socket.on('connect', () => document.querySelector('.status-dot').classList.add('green'));
+      socket.on('connect', () => {
+        document.querySelector('.status-dot').classList.add('green');
+      });
       socket.on('spotUpdated', () => fetchData());
     } catch (e) {
       console.warn('[ParkSync] Socket connection failed.');
     }
   }
 
+  // Inject Role Initializers
   try {
     if (GlobalState.currentView === 'admin' && typeof initAdmin === 'function') initAdmin();
     if (GlobalState.currentView === 'customer' && typeof initCustomer === 'function') initCustomer();
@@ -120,6 +129,7 @@ async function initDashboard() {
 }
 
 async function fetchData() {
+  console.log('[ParkSync] Refreshing Local State...');
   try {
     const headers = { 'Authorization': `Bearer ${GlobalState.token}` };
     
