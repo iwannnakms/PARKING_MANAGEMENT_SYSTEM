@@ -292,6 +292,8 @@ body {
 .spot-card.mini .spot-status { display: none; }
 .spot-card.mini:hover { transform: none; }
 
+.admin-mini-grid .spot-card.selected::after { display: none; }
+
 .activity-table { width: 100%; border-collapse: collapse; }
 .activity-table th { text-align: left; padding: 12px; font-size: 11px; color: var(--text-muted); border-bottom: 1px solid rgba(255,255,255,0.05); text-transform: uppercase; letter-spacing: 1px; }
 .activity-table td { padding: 14px 12px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.02); }

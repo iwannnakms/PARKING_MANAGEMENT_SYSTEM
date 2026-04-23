@@ -218,12 +218,18 @@ function updateAdminOccupancyChart(stats) {
   };
   if (adminOccupancyChart) {
     adminOccupancyChart.data = data;
-    adminOccupancyChart.update();
+    adminOccupancyChart.update('none'); // Update without animation
   } else {
     adminOccupancyChart = new Chart(canvas, {
       type: 'doughnut',
       data: data,
-      options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { family: 'Outfit', size: 11 } } } } }
+      options: { 
+        responsive: true, 
+        maintainAspectRatio: false, 
+        cutout: '75%', 
+        animation: { duration: 1000 }, // Initial entrance animation only
+        plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { family: 'Outfit', size: 11 } } } } 
+      }
     });
   }
 }
