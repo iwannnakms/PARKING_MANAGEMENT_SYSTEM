@@ -63,10 +63,11 @@ const ICONS = {
   history: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>',
   logout: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="17 16 21 12 17 8"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>'
 };
-
 function buildSidebar(role) {
   const sidebarMenu = document.getElementById('sidebar-menu');
+  if (!sidebarMenu) return; // Mobile safety
   sidebarMenu.innerHTML = '';
+...
   const navItems = [];
   if (role === 'admin') {
     navItems.push({ id: 'main', label: 'Analytics', icon: ICONS.dashboard });

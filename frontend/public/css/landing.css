@@ -484,7 +484,37 @@ html {
 
 @media (max-width: 768px) {
   section { padding: 80px 5%; }
+  h1 { font-size: 42px; letter-spacing: -1px; }
+  p { font-size: 16px; }
+  
+  .hero-section { text-align: center; justify-content: center; }
+  .hero-content { max-width: 100%; }
+  
+  .features-grid { grid-template-columns: 1fr; }
+  .feature-card { padding: 32px; }
+
   .step-item { flex-direction: column; gap: 20px; text-align: center; }
-  .section-title h2, .cta-box h2 { font-size: 32px; }
+  .step-num { font-size: 48px; }
+
+  .section-title h2, .cta-box h2 { font-size: 28px; line-height: 1.2; }
+  .cta-box { padding: 40px 24px; border-radius: 24px; }
+  
+  .auth-container { 
+    width: 95%; 
+    padding: 32px 24px; 
+    border-radius: 24px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  .btn-glow { width: 100%; padding: 16px 32px; font-size: 16px; }
+  .stats-mini { justify-content: center; gap: 20px; }
+}
+
+@media (max-width: 480px) {
+  h1 { font-size: 36px; }
+  .stats-mini { flex-direction: column; gap: 15px; }
+  .auth-toggle { margin-bottom: 24px; }
+  .forms-container { min-height: 400px; }
 }
 
