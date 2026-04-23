@@ -215,12 +215,20 @@ p {
 
 .close-btn {
   position: absolute;
-  top: 24px; right: 24px;
-  background: none; border: none;
+  top: 16px; right: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
   color: var(--text-muted);
-  font-size: 32px;
+  font-size: 24px;
   cursor: pointer;
-  transition: color 0.3s;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
 }
 
 .close-btn:hover { color: white; }

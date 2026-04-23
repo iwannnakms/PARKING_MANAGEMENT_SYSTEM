@@ -344,4 +344,11 @@ body {
   .parking-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 12px; }
   .spot-card { padding: 16px 8px; border-radius: 14px; }
   .spot-number { font-size: 18px; }
+  
+  /* Fix Guard Force Buttons on Mobile */
+  .guard-grid { display: flex !important; flex-direction: column !important; gap: 20px; }
+  .status-panel { order: 2; width: 100%; }
+  .scanner-panel { order: 1; width: 100%; }
+  .action-buttons { flex-direction: row !important; display: flex !important; width: 100%; }
+  .action-btn { flex: 1; padding: 14px; font-size: 11px; }
 }
