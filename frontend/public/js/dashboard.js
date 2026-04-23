@@ -46,9 +46,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   GlobalState.currentUser = JSON.parse(userStr);
   GlobalState.currentView = GlobalState.currentUser.role;
 
-  const switcher = document.getElementById('dev-role-switcher');
-  if (switcher) switcher.value = GlobalState.currentView;
-  
   document.getElementById('role-display').innerText = GlobalState.currentUser.role.toUpperCase();
   const avatar = document.querySelector('.avatar');
   avatar.src = `https://ui-avatars.com/api/?name=${GlobalState.currentUser.name}&background=6366f1&color=fff&bold=true`;
@@ -56,14 +53,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   buildSidebar(GlobalState.currentView);
   await initDashboard();
 });
-
-function switchRole(newRole) {
-  GlobalState.currentView = newRole;
-  GlobalState.activeTab = 'main';
-  document.getElementById('role-display').innerText = newRole.toUpperCase();
-  buildSidebar(newRole);
-  initDashboard();
-}
 
 const ICONS = {
   dashboard: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>',
