@@ -21,10 +21,16 @@ router.post('/book', verifyToken, requireRole('customer'), bookingController.boo
 // Cancel a booking (Requires login, Customer only)
 router.post('/cancel', verifyToken, requireRole('customer'), bookingController.cancelBooking);
 
-// Force Action (Requires login, Guard only)
-router.post('/force', verifyToken, requireRole('guard'), bookingController.forceAction);
+// Force Action (Requires login, Guard or Admin)
+router.post('/force', verifyToken, (req, res, next) => {
+  if (req.user.role === 'admin' || req.user.role === 'guard') return next();
+  return res.status(403).json({ error: 'Access denied.' });
+}, bookingController.forceAction);
 
-// Unified Validation (Requires login, Guard only) - Handles Entry & Exit
+// Manage Spot Count (Requires login, Admin only)
+router.post('/manage-spots', verifyToken, requireRole('admin'), bookingController.manageSpots);
+
+// Unified Validation (Requires login, Guard only)
 router.post('/validate-token', verifyToken, requireRole('guard'), bookingController.validateToken);
 
 // Get Recent Activity Log (Requires login, Admin or Guard)

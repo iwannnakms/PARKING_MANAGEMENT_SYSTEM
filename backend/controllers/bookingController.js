@@ -1,5 +1,6 @@
 const Spot = require('../models/Spot');
 const Booking = require('../models/Booking');
+const User = require('../models/User');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
 
@@ -79,7 +80,7 @@ exports.validateToken = async (req, res) => {
       if (!booking) return res.status(404).json({ error: 'No active booking found.' });
       
       booking.status = 'Checked-In';
-      booking.checkInTime = Date.now(); // Log Check-in
+      booking.checkInTime = Date.now();
       booking.spot.status = 'Occupied';
       await booking.save();
       await booking.spot.save();
@@ -91,7 +92,7 @@ exports.validateToken = async (req, res) => {
       if (!booking) return res.status(404).json({ error: 'No vehicle found inside.' });
       
       booking.status = 'Completed';
-      booking.endTime = Date.now(); // Log Check-out
+      booking.endTime = Date.now();
       booking.spot.status = 'Available';
       booking.spot.currentBookingId = null;
       await booking.save();
@@ -138,7 +139,39 @@ exports.forceAction = async (req, res) => {
   }
 };
 
-// ... and the rest of simple getters
+// Manage Spot Count (Admin only)
+exports.manageSpots = async (req, res) => {
+  try {
+    const { targetCount } = req.body;
+    const currentCount = await Spot.countDocuments();
+    
+    if (targetCount > currentCount) {
+      const spotsToAdd = [];
+      for (let i = currentCount + 1; i <= targetCount; i++) {
+        spotsToAdd.push({
+          spotNumber: `A${i.toString().padStart(2, '0')}`,
+          status: 'Available'
+        });
+      }
+      await Spot.insertMany(spotsToAdd);
+    } else if (targetCount < currentCount) {
+      const diff = currentCount - targetCount;
+      const spotsToRemove = await Spot.find({ status: 'Available' })
+        .sort({ spotNumber: -1 })
+        .limit(diff);
+      
+      const ids = spotsToRemove.map(s => s._id);
+      await Spot.deleteMany({ _id: { $in: ids } });
+    }
+
+    req.io.emit('spotUpdated', { refresh: true });
+    res.status(200).json({ message: `Inventory updated to ${targetCount} spots` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Simple getters
 exports.getSpots = async (req, res) => {
   try {
     const spots = await Spot.find().sort({ spotNumber: 1 });
@@ -191,7 +224,7 @@ exports.getAdminStats = async (req, res) => {
     const bookedSpots = await Spot.countDocuments({ status: 'Booked' });
     const occupiedSpots = await Spot.countDocuments({ status: 'Occupied' });
     const checkInCount = await Booking.countDocuments({ status: { $in: ['Checked-In', 'Completed'] } });
-    const totalRevenue = checkInCount * 100; // Updated to ₹100
+    const totalRevenue = checkInCount * 100;
     const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
     const dailyCheckins = await Booking.countDocuments({ status: 'Checked-In', updatedAt: { $gte: startOfDay } });
     const recentActivity = await Booking.find().sort({ updatedAt: -1 }).limit(10).populate('user').populate('spot');
