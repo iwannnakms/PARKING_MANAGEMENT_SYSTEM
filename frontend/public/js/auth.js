@@ -5,7 +5,15 @@ const API_BASE_URL = '/api';
 // Toggle Auth Modal
 function toggleAuthModal() {
   const overlay = document.getElementById('auth-overlay');
-  overlay.classList.toggle('hidden');
+  if (!overlay) return;
+  
+  if (overlay.classList.contains('hidden')) {
+    overlay.classList.remove('hidden');
+    overlay.style.display = 'flex'; // Enforce flex on mobile
+  } else {
+    overlay.classList.add('hidden');
+    overlay.style.display = 'none';
+  }
 }
 
 // Switch between Login and Sign Up forms
@@ -34,6 +42,8 @@ function showAuthForm(type) {
 // Handle Login
 document.getElementById('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
+  console.log('[ParkSync Auth] Initializing Login Sequence...');
+
   const email = document.getElementById('login-email').value;
   const password = document.getElementById('login-password').value;
   const errorEl = document.getElementById('login-error');
@@ -41,7 +51,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   errorEl.innerText = '';
   const submitBtn = e.target.querySelector('button');
   submitBtn.disabled = true;
-  submitBtn.innerText = 'Authenticating...';
+  submitBtn.innerText = 'Authorizing...';
 
   try {
     const res = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -56,20 +66,32 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
       throw new Error(data.error || 'Login failed');
     }
 
+    // Success: Commit to storage and verify
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
-    window.location.href = 'dashboard.html';
+
+    submitBtn.innerText = 'Identity Verified';
+    submitBtn.style.background = '#10b981';
+
+    // Small delay to ensure mobile storage persistence
+    setTimeout(() => {
+      window.location.href = '/dashboard.html';
+    }, 500);
 
   } catch (err) {
+    console.error('[ParkSync Auth] Login Error:', err);
     errorEl.innerText = err.message;
     submitBtn.disabled = false;
     submitBtn.innerText = 'Sign In →';
+    submitBtn.style.background = '';
   }
 });
 
 // Handle Sign Up
 document.getElementById('signup-form').addEventListener('submit', async (e) => {
   e.preventDefault();
+  console.log('[ParkSync Auth] Initializing Registration...');
+
   const name = document.getElementById('signup-name').value;
   const email = document.getElementById('signup-email').value;
   const password = document.getElementById('signup-password').value;
@@ -78,7 +100,7 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
   errorEl.innerText = '';
   const submitBtn = e.target.querySelector('button');
   submitBtn.disabled = true;
-  submitBtn.innerText = 'Creating Account...';
+  submitBtn.innerText = 'Creating Profile...';
 
   try {
     const res = await fetch(`${API_BASE_URL}/auth/register`, {
@@ -93,8 +115,8 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
       throw new Error(data.error || 'Registration failed');
     }
 
-    // Success: Auto-Login immediately
-    submitBtn.innerText = 'Initializing Profile...';
+    // Success: Auto-Login
+    submitBtn.innerText = 'Initializing...';
     
     const loginRes = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
@@ -107,9 +129,8 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
     if (loginRes.ok) {
       localStorage.setItem('token', loginData.token);
       localStorage.setItem('user', JSON.stringify(loginData.user));
-      window.location.href = 'dashboard.html';
+      window.location.href = '/dashboard.html';
     } else {
-      // Fallback if auto-login fails for some reason
       showAuthForm('login');
       document.getElementById('login-email').value = email;
     }
@@ -130,17 +151,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (entry.isIntersecting) {
         entry.target.classList.add('visible');
       } else {
-        // Remove class when scrolled out to allow re-animation
         entry.target.classList.remove('visible');
       }
     });
   }, {
-    threshold: 0.1, // Trigger slightly earlier for smoother flow
-    rootMargin: "0px 0px -50px 0px" // Add offset so it doesn't trigger at the very bottom edge
+    threshold: 0.1,
+    rootMargin: "0px 0px -50px 0px"
   });
 
   revealElements.forEach(el => {
     revealObserver.observe(el);
   });
 });
-
